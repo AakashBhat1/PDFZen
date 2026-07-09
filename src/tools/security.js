@@ -1,4 +1,11 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument as CantooPDFDocument } from '@cantoo/pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function createSecurityUI(container, title, subtitle, icon, isPasswordMode = false) {
   container.innerHTML = `
@@ -87,11 +94,9 @@ export function initProtect(container) {
     `;
 
     try {
-      // 1. Load pdf-lib CDN
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
+
       
-      // 2. Load pdf-encrypt-lite ESM package dynamically
-      const { encryptPDF } = await import('https://cdn.jsdelivr.net/npm/@pdfsmaller/pdf-encrypt-lite/+esm');
+
       
       // 3. Encrypt the file
       const encryptedBytes = await encryptPDF(new Uint8Array(fileBuffer), password);
@@ -163,11 +168,7 @@ export function initUnlock(container) {
     `;
 
     try {
-      // Load @cantoo/pdf-lib which has password decrypt support
-      await loadScript('https://unpkg.com/@cantoo/pdf-lib@1.18.0/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
-
-      const pdfDoc = await PDFDocument.load(fileBuffer, { password: password });
+      const pdfDoc = await CantooPDFDocument.load(fileBuffer, { password: password });
       const decryptedBytes = await pdfDoc.save(); // Automatically saves unencrypted
 
       const outputName = file.name.replace(/\.pdf$/i, '') + '_unlocked.pdf';
@@ -242,10 +243,7 @@ export function initRedact(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);
@@ -343,8 +341,7 @@ export function initRedact(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument, rgb } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const page = pdfDoc.getPages()[0];
@@ -440,8 +437,7 @@ export function initRepair(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       // Loading with ignoreEncryption will skip errors and reconstruct file
       const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
@@ -511,8 +507,7 @@ export function initPdfA(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       

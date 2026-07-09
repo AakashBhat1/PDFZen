@@ -1,4 +1,15 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, downloadZipOfFiles } from '../utils.js';
+import { Document, Paragraph, TextRun, Packer } from 'docx';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import mammoth from 'mammoth';
+import html2pdf from 'html2pdf.js';
+import * as XLSX from 'xlsx';
+import PptxGenJS from 'pptxgenjs';
+import JSZip from 'jszip';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 // --- Shared File Input & UI Builder Helper ---
 function createConvertUI(container, options) {
@@ -57,10 +68,7 @@ function createConvertUI(container, options) {
 
 // --- Text Extractor Helper for PDF Parsing ---
 async function extractPDFText(arrayBuffer, progressCallback) {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-  
-  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
   const numPages = pdf.numPages;
   const pagesText = []; // Array of arrays (lines of text)
 
@@ -209,16 +217,9 @@ export function initPdfToWord(container) {
         progress.progressBar.style.width = `${10 + (current / total) * 50}%`;
       });
 
-      // 2. Load docx.js
-      progress.progressText.innerText = 'Loading Word generating engine...';
-      progress.progressBar.style.width = '70%';
-      await loadScript('https://cdn.jsdelivr.net/npm/docx@8.2.0/build/index.umd.min.js');
-
       // 3. Create document
       progress.progressText.innerText = 'Creating Word file...';
       progress.progressBar.style.width = '85%';
-      
-      const { Document, Paragraph, TextRun, Packer } = window.docx;
       
       const docChildren = [];
       pagesText.forEach((lines, pageIdx) => {
@@ -297,18 +298,16 @@ export function initWordToPdf(container) {
     const progress = showProgressView(container, 'Loading conversion tools...');
     
     try {
-      // 1. Load mammoth.js to convert docx to HTML
+      // 1. Convert docx to HTML using mammoth
       progress.progressText.innerText = 'Extracting Word layout...';
       progress.progressBar.style.width = '30%';
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
       
-      const result = await window.mammoth.convertToHtml({ arrayBuffer: fileBuffer });
+      const result = await mammoth.convertToHtml({ arrayBuffer: fileBuffer });
       const htmlContent = result.value; // The rendered html string
 
-      // 2. Load html2pdf.js
+      // 2. Render to PDF
       progress.progressText.innerText = 'Loading PDF render engine...';
       progress.progressBar.style.width = '60%';
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
 
       // 3. Render HTML in a structured paper format
       progress.progressText.innerText = 'Rendering layouts...';
@@ -334,7 +333,7 @@ export function initWordToPdf(container) {
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
       };
 
-      const pdfBlob = await window.html2pdf().set(opt).from(renderContainer).output('blob');
+      const pdfBlob = await html2pdf().set(opt).from(renderContainer).output('blob');
       
       // Cleanup
       document.body.removeChild(renderContainer);
@@ -396,16 +395,9 @@ export function initPdfToExcel(container) {
         progress.progressBar.style.width = `${10 + (current / total) * 50}%`;
       });
 
-      // Load SheetJS xlsx.js
-      progress.progressText.innerText = 'Loading SheetJS engine...';
-      progress.progressBar.style.width = '70%';
-      await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
-
       // Create workbook
       progress.progressText.innerText = 'Structuring Excel columns...';
       progress.progressBar.style.width = '85%';
-      
-      const XLSX = window.XLSX;
       const wb = XLSX.utils.book_new();
 
       pagesText.forEach((lines, pageIdx) => {
@@ -476,9 +468,7 @@ export function initExcelToPdf(container) {
     const progress = showProgressView(container, 'Parsing Excel workbook...');
     
     try {
-      // 1. Load XLSX parser
-      await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
-      const XLSX = window.XLSX;
+      // 1. Parse XLSX
       
       progress.progressText.innerText = 'Extracting sheet values...';
       progress.progressBar.style.width = '40%';
@@ -500,10 +490,9 @@ export function initExcelToPdf(container) {
         `;
       });
 
-      // 2. Load PDF Renderer
+      // 2. Render to PDF
       progress.progressText.innerText = 'Configuring layout...';
       progress.progressBar.style.width = '70%';
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
 
       const renderContainer = document.createElement('div');
       renderContainer.style.cssText = 'padding: 40px; background:#fff; color:#333; font-family:sans-serif; font-size:11px;';
@@ -533,7 +522,7 @@ export function initExcelToPdf(container) {
         jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
       };
 
-      const pdfBlob = await window.html2pdf().set(opt).from(renderContainer).output('blob');
+      const pdfBlob = await html2pdf().set(opt).from(renderContainer).output('blob');
       document.body.removeChild(renderContainer);
       progress.progressBar.style.width = '100%';
 
@@ -593,15 +582,10 @@ export function initPdfToPowerpoint(container) {
         progress.progressBar.style.width = `${10 + (current / total) * 50}%`;
       });
 
-      // Load PptxGenJS
-      progress.progressText.innerText = 'Loading PowerPoint slide engine...';
-      progress.progressBar.style.width = '70%';
-      await loadScript('https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js');
-
       progress.progressText.innerText = 'Creating presentation...';
       progress.progressBar.style.width = '85%';
       
-      const pres = new window.PptxGenJS();
+      const pres = new PptxGenJS();
       
       pagesText.forEach((lines, pageIdx) => {
         const slide = pres.addSlide();
@@ -701,9 +685,7 @@ export function initPowerpointToPdf(container) {
     const progress = showProgressView(container, 'Unpacking PowerPoint slides...');
     
     try {
-      // Load JSZip
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-      const zip = await window.JSZip.loadAsync(fileBuffer);
+      const zip = await JSZip.loadAsync(fileBuffer);
       
       progress.progressText.innerText = 'Parsing slide XML content...';
       progress.progressBar.style.width = '40%';
@@ -751,10 +733,8 @@ export function initPowerpointToPdf(container) {
         `;
       }
 
-      // Load PDF Renderer
       progress.progressText.innerText = 'Creating PDF document...';
       progress.progressBar.style.width = '70%';
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
 
       const renderContainer = document.createElement('div');
       renderContainer.innerHTML = slidesHtml;
@@ -775,7 +755,7 @@ export function initPowerpointToPdf(container) {
         jsPDF: { unit: 'in', format: [10, 7.5], orientation: 'landscape' }
       };
 
-      const pdfBlob = await window.html2pdf().set(opt).from(renderContainer).output('blob');
+      const pdfBlob = await html2pdf().set(opt).from(renderContainer).output('blob');
       document.body.removeChild(renderContainer);
       progress.progressBar.style.width = '100%';
 
@@ -830,10 +810,7 @@ export function initPdfToJpg(container) {
     const progress = showProgressView(container, 'Loading render tools...');
     
     try {
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const totalPages = pdf.numPages;
       const filesToZip = [];
 
@@ -859,9 +836,7 @@ export function initPdfToJpg(container) {
       
       const zipName = file.name.replace(/\.pdf$/i, '') + '_images.zip';
       
-      // Download ZIP via JSZip Base64 method
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-      const zip = new window.JSZip();
+      const zip = new JSZip();
       filesToZip.forEach(f => {
         zip.file(f.name, f.data, { base64: true });
       });
@@ -1022,8 +997,6 @@ export function initJpgToPdf(container) {
     const progress = showProgressView(container, 'Loading PDF creation engine...');
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
       
       const pdfDoc = await PDFDocument.create();
       
@@ -1330,7 +1303,7 @@ export function initHtmlToPdf(container) {
     const progress = showProgressView(container, 'Loading render tools...');
     
     try {
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+
       
       progress.progressText.innerText = 'Generating PDF pages...';
       progress.progressBar.style.width = '70%';
@@ -1352,7 +1325,7 @@ export function initHtmlToPdf(container) {
         jsPDF: { unit: 'in', format: 'letter', orientation: orientation }
       };
 
-      const pdfBlob = await window.html2pdf().set(opt).from(renderContainer).output('blob');
+      const pdfBlob = await html2pdf().set(opt).from(renderContainer).output('blob');
       document.body.removeChild(renderContainer);
       progress.progressBar.style.width = '100%';
 

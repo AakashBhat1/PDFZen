@@ -1,4 +1,9 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function createEditorUI(container, title, subtitle, isSignMode = false) {
   container.innerHTML = `
@@ -158,10 +163,7 @@ export function initEditPdf(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);
@@ -292,8 +294,7 @@ export function initEditPdf(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const firstPage = pdfDoc.getPages()[0];
@@ -385,10 +386,7 @@ export function initSign(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);
@@ -540,8 +538,7 @@ export function initSign(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const firstPage = pdfDoc.getPages()[0];

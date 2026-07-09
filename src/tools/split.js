@@ -1,4 +1,9 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, downloadZipOfFiles } from '../utils.js';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export function initSplit(container) {
   let selectedFile = null;
@@ -216,11 +221,7 @@ export function initSplit(container) {
     try {
       fileBuffer = await fileToArrayBuffer(file);
       
-      // 1. Load pdf.js to render thumbnails
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      
-      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      pdfDocInstance = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       pageCount = pdfDocInstance.numPages;
       fileMeta.innerText = `Pages: ${pageCount} | Size: ${formatBytes(file.size)}`;
       
@@ -323,8 +324,7 @@ export function initSplit(container) {
       progressText.innerText = 'Loading PDF engine...';
       progressBar.style.width = '10%';
       
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
       
       const srcDoc = await PDFDocument.load(fileBuffer);
       const mode = splitMode.value;

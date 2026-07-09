@@ -1,4 +1,10 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas } from '../utils.js';
+import { etsplLogo } from './logo-base64.js';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 // --- Shared PDF Input UI helper ---
 function createOrganizeUI(container, title, subtitle, icon) {
@@ -9,6 +15,9 @@ function createOrganizeUI(container, title, subtitle, icon) {
         <h4>${title}</h4>
         <p>${subtitle}</p>
         <input type="file" id="org-file-input" class="file-input-hidden" accept="application/pdf">
+        <button id="btn-load-test-pdf" type="button" class="btn btn-secondary" style="margin-top: 1rem; pointer-events: auto;">
+          <i class="bi bi-file-earmark-pdf"></i> Load Test PDF
+        </button>
       </div>
       
       <div id="org-preview-container" style="display: none; margin-top: 1.5rem; width: 100%;">
@@ -29,9 +38,40 @@ function createOrganizeUI(container, title, subtitle, icon) {
     </div>
   `;
 
+  const dropzone = container.querySelector('#org-dropzone');
+  const fileInput = container.querySelector('#org-file-input');
+  const btnLoadTestPdf = container.querySelector('#btn-load-test-pdf');
+
+  dropzone.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-load-test-pdf')) return;
+    fileInput.click();
+  });
+
+  btnLoadTestPdf.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      btnLoadTestPdf.innerText = 'Loading...';
+      btnLoadTestPdf.disabled = true;
+      const res = await fetch('/test/Visit report 030726 Yk-54.pdf');
+      if (!res.ok) throw new Error('Failed to fetch test PDF');
+      const blob = await res.blob();
+      const file = new File([blob], 'Visit report 030726 Yk-54.pdf', { type: 'application/pdf' });
+      
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      fileInput.files = dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (err) {
+      console.error(err);
+      alert('Error loading test PDF: ' + err.message);
+      btnLoadTestPdf.innerText = 'Load Test PDF';
+      btnLoadTestPdf.disabled = false;
+    }
+  });
+
   return {
-    dropzone: container.querySelector('#org-dropzone'),
-    fileInput: container.querySelector('#org-file-input'),
+    dropzone: dropzone,
+    fileInput: fileInput,
     previewContainer: container.querySelector('#org-preview-container'),
     pagesGrid: container.querySelector('#org-pages-grid'),
     fileMeta: container.querySelector('#org-file-meta'),
@@ -59,7 +99,7 @@ export function initOrganize(container) {
     </button>
   `;
 
-  ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+
   ui.fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
@@ -72,10 +112,7 @@ export function initOrganize(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
@@ -109,6 +146,7 @@ export function initOrganize(container) {
     pageList.forEach((item, index) => {
       const card = document.createElement('div');
       card.className = 'page-thumbnail-card';
+      card.setAttribute('draggable', true);
       
       if (item.type === 'blank') {
         card.innerHTML = `
@@ -129,6 +167,53 @@ export function initOrganize(container) {
           <button class="btn-overlay btn-delete" title="Delete"><i class="bi bi-trash"></i></button>
         </div>
       `;
+
+      // Drag and Drop Event Listeners
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', index);
+        e.dataTransfer.effectAllowed = 'move';
+        card.style.opacity = '0.4';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.style.opacity = '1';
+        ui.pagesGrid.querySelectorAll('.page-thumbnail-card').forEach(c => {
+          c.style.border = '2px solid transparent';
+          c.style.transform = '';
+          c.style.boxShadow = '';
+        });
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+
+      card.addEventListener('dragenter', () => {
+        card.style.border = '2px dashed var(--primary-color)';
+        card.style.transform = 'scale(1.03)';
+        card.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.4)';
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.style.border = '2px solid transparent';
+        card.style.transform = '';
+        card.style.boxShadow = '';
+      });
+
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.style.border = '2px solid transparent';
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        
+        const draggedIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!isNaN(draggedIndex) && draggedIndex !== index) {
+          const [draggedItem] = pageList.splice(draggedIndex, 1);
+          pageList.splice(index, 0, draggedItem);
+          renderGrid();
+        }
+      });
 
       card.querySelector('.btn-move-left').addEventListener('click', (e) => { e.stopPropagation(); shiftPage(index, -1); });
       card.querySelector('.btn-move-right').addEventListener('click', (e) => { e.stopPropagation(); shiftPage(index, 1); });
@@ -185,8 +270,7 @@ export function initOrganize(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const srcDoc = await PDFDocument.load(fileBuffer);
       const newDoc = await PDFDocument.create();
@@ -251,7 +335,7 @@ export function initRotate(container) {
     </div>
   `;
 
-  ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+
   ui.fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
@@ -264,10 +348,7 @@ export function initRotate(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
@@ -341,8 +422,7 @@ export function initRotate(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument, degrees } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const pages = pdfDoc.getPages();
@@ -418,7 +498,7 @@ export function initCrop(container) {
     </div>
   `;
 
-  ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+
   ui.fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
@@ -431,10 +511,7 @@ export function initCrop(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      pdfDocInstance = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdfDocInstance.numPages}`;
       
       // Load page 1
@@ -510,6 +587,9 @@ export function initCrop(container) {
     const height = Math.abs(endY - startY);
     if (width < 10 || height < 10) return alert('Please select a larger cropping region.');
 
+    const cropScopeEl = container.querySelector('#crop-scope');
+    const scope = cropScopeEl ? cropScopeEl.value : 'current';
+
     container.innerHTML = `
       <div class="workspace-main-panel" style="grid-column: span 2;">
         <div class="processing-container">
@@ -520,11 +600,9 @@ export function initCrop(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
-      const scope = container.querySelector('#crop-scope').value;
 
       // Map browser canvas coordinates to original pdf-lib page coordinates
       // Bounding boxes in PDF start from bottom-left (Y = 0 is bottom). Canvas Y = 0 is top.
@@ -625,7 +703,7 @@ export function initPageNumbers(container) {
     </label>
   `;
 
-  ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+
   ui.fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
@@ -638,10 +716,7 @@ export function initPageNumbers(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages} | Ready to stamp page numbers.`;
       
       // Load page 1 preview
@@ -661,6 +736,16 @@ export function initPageNumbers(container) {
   ui.runBtn.addEventListener('click', async () => {
     if (!fileBuffer) return;
 
+    const numPosEl = container.querySelector('#num-pos');
+    const numFormatEl = container.querySelector('#num-format');
+    const numStartEl = container.querySelector('#num-start');
+    const numSkipFirstEl = container.querySelector('#num-skip-first');
+
+    const position = numPosEl ? numPosEl.value : 'bottom-center';
+    const format = numFormatEl ? numFormatEl.value : 'simple';
+    const startNum = numStartEl ? (parseInt(numStartEl.value, 10) || 1) : 1;
+    const skipFirst = numSkipFirstEl ? numSkipFirstEl.checked : false;
+
     container.innerHTML = `
       <div class="workspace-main-panel" style="grid-column: span 2;">
         <div class="processing-container">
@@ -671,17 +756,11 @@ export function initPageNumbers(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const pages = pdfDoc.getPages();
       const count = pages.length;
-
-      const position = container.querySelector('#num-pos').value;
-      const format = container.querySelector('#num-format').value;
-      const startNum = parseInt(container.querySelector('#num-start').value, 10) || 1;
-      const skipFirst = container.querySelector('#num-skip-first').checked;
 
       const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontSize = 10;
@@ -760,6 +839,16 @@ export function initPageNumbers(container) {
 // ==========================================
 // 5. WATERMARK PDF
 // ==========================================
+function dataURIToArrayBuffer(dataURI) {
+  const byteString = atob(dataURI.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return ab;
+}
+
 export function initWatermark(container) {
   const ui = createOrganizeUI(container, 'Drag & Drop PDF file here', 'Overlay text or images over pages', 'bi-textarea-t');
   
@@ -775,6 +864,7 @@ export function initWatermark(container) {
       <select id="wm-type" class="form-control">
         <option value="text">Confidential Text</option>
         <option value="image">Custom Logo/Image</option>
+        <option value="etspl">ETSPL Logo</option>
       </select>
     </div>
 
@@ -798,9 +888,19 @@ export function initWatermark(container) {
         <option value="0.6">Solid (60%)</option>
       </select>
     </div>
+
+    <div class="form-group" style="margin-top:0.75rem;">
+      <label for="wm-size">Watermark Size</label>
+      <select id="wm-size" class="form-control">
+        <option value="small">Small</option>
+        <option value="medium" selected>Medium</option>
+        <option value="large">Large</option>
+        <option value="xlarge">Extra Large</option>
+      </select>
+    </div>
   `;
 
-  ui.dropzone.addEventListener('click', () => ui.fileInput.click());
+
   ui.fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
@@ -832,10 +932,7 @@ export function initWatermark(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);
@@ -859,6 +956,14 @@ export function initWatermark(container) {
       return alert('Please upload a watermark logo image first.');
     }
 
+    const opacityEl = container.querySelector('#wm-opacity');
+    const textEl = container.querySelector('#wm-text');
+    const sizeEl = container.querySelector('#wm-size');
+
+    const opacity = opacityEl ? (parseFloat(opacityEl.value) || 0.2) : 0.2;
+    const textVal = textEl ? (textEl.value.trim() || 'CONFIDENTIAL') : 'CONFIDENTIAL';
+    const sizeVal = sizeEl ? sizeEl.value : 'medium';
+
     container.innerHTML = `
       <div class="workspace-main-panel" style="grid-column: span 2;">
         <div class="processing-container">
@@ -869,31 +974,38 @@ export function initWatermark(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument, StandardFonts, rgb, degrees } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const pages = pdfDoc.getPages();
-      
-      const opacity = parseFloat(container.querySelector('#wm-opacity').value) || 0.2;
 
       if (type === 'text') {
-        const textVal = container.querySelector('#wm-text').value.trim() || 'CONFIDENTIAL';
+        let fontSize = 48;
+        if (sizeVal === 'small') fontSize = 32;
+        else if (sizeVal === 'large') fontSize = 72;
+        else if (sizeVal === 'xlarge') fontSize = 96;
+
         const helvetica = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        const fontSize = 48;
         const textWidth = helvetica.widthOfTextAtSize(textVal, fontSize);
+
+        const theta = 45 * Math.PI / 180;
+        const cos = Math.cos(theta);
+        const sin = Math.sin(theta);
 
         pages.forEach(page => {
           const w = page.getWidth();
           const h = page.getHeight();
           
           // Draw rotated diagonal watermark text in center
+          const x = w / 2 - (textWidth / 2 * cos - fontSize / 2 * sin);
+          const y = h / 2 - (textWidth / 2 * sin + fontSize / 2 * cos);
+
           page.drawText(textVal, {
-            x: w / 2 - textWidth / 2 * Math.cos(45 * Math.PI / 180),
-            y: h / 2 - 20,
+            x: x,
+            y: y,
             size: fontSize,
             font: helvetica,
-            color: rgb(0.8, 0.2, 0.2), // Light Red stamp
+            color: rgb(0.7, 0.7, 0.7), // Light gray stamp
             opacity: opacity,
             rotate: degrees(45)
           });
@@ -901,7 +1013,10 @@ export function initWatermark(container) {
       } else {
         // Image Logo stamp
         let embedImg;
-        if (watermarkImgType === 'png') {
+        if (type === 'etspl') {
+          const logoBuffer = dataURIToArrayBuffer(etsplLogo);
+          embedImg = await pdfDoc.embedPng(logoBuffer);
+        } else if (watermarkImgType === 'png') {
           embedImg = await pdfDoc.embedPng(watermarkImgBuffer);
         } else {
           embedImg = await pdfDoc.embedJpg(watermarkImgBuffer);
@@ -911,8 +1026,13 @@ export function initWatermark(container) {
           const w = page.getWidth();
           const h = page.getHeight();
 
-          // Calculate central watermark bounding box size (say 30% page width)
-          const scale = (w * 0.35) / embedImg.width;
+          let sizePercent = 0.35;
+          if (sizeVal === 'small') sizePercent = 0.15;
+          else if (sizeVal === 'large') sizePercent = 0.55;
+          else if (sizeVal === 'xlarge') sizePercent = 0.75;
+
+          // Calculate central watermark bounding box size
+          const scale = (w * sizePercent) / embedImg.width;
           const drawW = embedImg.width * scale;
           const drawH = embedImg.height * scale;
 

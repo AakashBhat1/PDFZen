@@ -1,4 +1,5 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer } from '../utils.js';
+import { PDFDocument } from 'pdf-lib';
 
 export function initMerge(container) {
   let uploadedFiles = []; // Array of { id, file, arrayBuffer, sizeFormatted }
@@ -173,12 +174,8 @@ export function initMerge(container) {
     const progressText = container.querySelector('#merge-progress-text');
 
     try {
-      // 1. Load pdf-lib CDN
       progressText.innerText = 'Loading PDF processing libraries...';
       progressBar.style.width = '10%';
-      
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
       
       // 2. Create Merged Document
       progressText.innerText = 'Initializing new PDF document...';

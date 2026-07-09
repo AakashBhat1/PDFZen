@@ -1,3 +1,5 @@
+import JSZip from 'jszip';
+
 /**
  * Dynamically loads a script file from a CDN if not already loaded.
  * @param {string} url - Script URL
@@ -148,9 +150,7 @@ export async function renderPDFPageToCanvas(pdfPage, scale = 1.5) {
  * @param {string} zipName 
  */
 export async function downloadZipOfFiles(filesToZip, zipName = 'pdfzen-bundle.zip') {
-  // Ensure JSZip is loaded
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-  const zip = new window.JSZip();
+  const zip = new JSZip();
   
   filesToZip.forEach(file => {
     zip.file(file.name, file.data);

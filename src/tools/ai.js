@@ -1,4 +1,10 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas } from '../utils.js';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import Tesseract from 'tesseract.js';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 import { state } from '../main.js';
 
 // --- Shared AI Input Helper ---
@@ -59,10 +65,7 @@ function createAIUI(container, options) {
 
 // --- Text Extraction for AI ---
 async function getPDFRawText(arrayBuffer) {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-  
-  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
   const numPages = pdf.numPages;
   let fullText = '';
 
@@ -378,9 +381,7 @@ export function initOcr(container) {
 
     // Show visual thumbnail preview
     try {
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page = await pdf.getPage(1);
       const canvas = await renderPDFPageToCanvas(page, 0.4);
       ui.canvasContainer.innerHTML = '';
@@ -402,23 +403,16 @@ export function initOcr(container) {
     try {
       const statusTxt = container.querySelector('#ocr-load-status');
       
-      // 1. Load pdfjs and Tesseract.js
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      
-      statusTxt.innerText = 'Loading Tesseract.js recognizer...';
-      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js');
-
       // 2. Fetch PDF Page 1 canvas
       statusTxt.innerText = 'Rendering page to image canvas...';
-      const pdfDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page = await pdfDoc.getPage(1);
       const canvas = await renderPDFPageToCanvas(page, 1.5); // high res for OCR accuracy
 
       // 3. Perform Tesseract OCR
       statusTxt.innerText = 'Running Character Recognition (Page 1)...';
       
-      const result = await window.Tesseract.recognize(canvas, 'eng', {
+      const result = await Tesseract.recognize(canvas, 'eng', {
         logger: m => {
           if (m.status === 'recognizing') {
             statusTxt.innerText = `Recognizing text... ${Math.floor(m.progress * 100)}%`;
@@ -603,8 +597,7 @@ export function initForms(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const form = pdfDoc.getForm();
@@ -613,9 +606,7 @@ export function initForms(container) {
       ui.fileMeta.innerText = `Detected ${fields.length} form fields.`;
 
       // Render Page 1 to let user fill it
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page1 = await pdfjsDoc.getPage(1);
       const canvas = await renderPDFPageToCanvas(page1, 1.2);
 
@@ -683,8 +674,7 @@ export function initForms(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
       
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const form = pdfDoc.getForm();
@@ -908,8 +898,7 @@ export function initScan(container) {
     `;
 
     try {
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      const { PDFDocument } = window.PDFLib;
+
 
       const pdfDoc = await PDFDocument.create();
 

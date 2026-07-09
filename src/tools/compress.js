@@ -1,4 +1,9 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { PDFDocument } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export function initCompress(container) {
   let selectedFile = null;
@@ -128,11 +133,7 @@ export function initCompress(container) {
     try {
       fileBuffer = await fileToArrayBuffer(file);
       
-      // Load pdfjs to check page count
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       pageCount = pdf.numPages;
       fileMetaEl.innerText = `Pages: ${pageCount} | Current Size: ${formatBytes(file.size)}`;
       runBtn.disabled = false;
@@ -175,19 +176,10 @@ export function initCompress(container) {
     const progressText = container.querySelector('#compress-progress-text');
 
     try {
-      // 1. Load pdfjs and pdf-lib
-      progressText.innerText = 'Loading PDF processing systems...';
-      progressBar.style.width = '10%';
-      
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      
-      await loadScript('https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js');
-      
       progressBar.style.width = '20%';
       
-      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
-      const pdfLibDoc = await window.PDFLib.PDFDocument.create();
+      const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdfLibDoc = await PDFDocument.create();
       
       // 2. Process page-by-page
       for (let i = 1; i <= pageCount; i++) {
