@@ -1,6 +1,6 @@
 # PDFZen
 
-PDFZen is a premium, client-side, single-page web application (SPA) offering a comprehensive suite of **29 document processing tools**. Running entirely in the user's browser, PDFZen ensures that your files are processed locally and kept 100% private.
+PDFZen is a premium, client-side, single-page web application (SPA) offering a comprehensive suite of **29 document processing tools** inspired by **iLovePDF**. Running entirely in the user's browser, PDFZen ensures that your files are processed locally and kept 100% private.
 
 ## Key Features
 
