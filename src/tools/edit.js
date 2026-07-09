@@ -161,7 +161,7 @@ export function initEditPdf(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);
@@ -388,7 +388,7 @@ export function initSign(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);

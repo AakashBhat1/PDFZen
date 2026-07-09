@@ -75,7 +75,7 @@ export function initOrganize(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
@@ -267,7 +267,7 @@ export function initRotate(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
@@ -434,7 +434,7 @@ export function initCrop(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdfDocInstance.numPages}`;
       
       // Load page 1
@@ -641,7 +641,7 @@ export function initPageNumbers(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages} | Ready to stamp page numbers.`;
       
       // Load page 1 preview
@@ -835,7 +835,7 @@ export function initWatermark(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);

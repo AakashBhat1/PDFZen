@@ -62,7 +62,7 @@ async function getPDFRawText(arrayBuffer) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
   
-  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
   const numPages = pdf.numPages;
   let fullText = '';
 
@@ -380,7 +380,7 @@ export function initOcr(container) {
     try {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page = await pdf.getPage(1);
       const canvas = await renderPDFPageToCanvas(page, 0.4);
       ui.canvasContainer.innerHTML = '';
@@ -411,7 +411,7 @@ export function initOcr(container) {
 
       // 2. Fetch PDF Page 1 canvas
       statusTxt.innerText = 'Rendering page to image canvas...';
-      const pdfDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdfDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page = await pdfDoc.getPage(1);
       const canvas = await renderPDFPageToCanvas(page, 1.5); // high res for OCR accuracy
 
@@ -615,7 +615,7 @@ export function initForms(container) {
       // Render Page 1 to let user fill it
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const page1 = await pdfjsDoc.getPage(1);
       const canvas = await renderPDFPageToCanvas(page1, 1.2);
 

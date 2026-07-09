@@ -12,6 +12,9 @@ export function initCompress(container) {
         <h4>Drag & Drop PDF file to Compress</h4>
         <p>or click to browse from your computer</p>
         <input type="file" id="compress-file-input" class="file-input-hidden" accept="application/pdf">
+        <button id="btn-load-test-pdf" type="button" class="btn btn-secondary" style="margin-top: 1rem; pointer-events: auto;">
+          <i class="bi bi-file-earmark-pdf"></i> Load Test PDF
+        </button>
       </div>
       
       <div id="compress-preview-container" style="display: none; text-align: center; padding: 2rem;">
@@ -64,8 +67,32 @@ export function initCompress(container) {
   const fileNameEl = container.querySelector('#compress-file-name');
   const fileMetaEl = container.querySelector('#compress-file-meta');
   const runBtn = container.querySelector('#btn-run-compress');
+  const btnLoadTestPdf = container.querySelector('#btn-load-test-pdf');
 
-  dropzone.addEventListener('click', () => fileInput.click());
+  // Trigger file selection
+  dropzone.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-load-test-pdf')) return;
+    fileInput.click();
+  });
+
+  btnLoadTestPdf.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      btnLoadTestPdf.innerText = 'Loading...';
+      btnLoadTestPdf.disabled = true;
+      const res = await fetch('/test/MyDefence_Digital_Catalogue_June_2026.pdf');
+      if (!res.ok) throw new Error('Failed to fetch test PDF');
+      const blob = await res.blob();
+      const file = new File([blob], 'MyDefence_Digital_Catalogue_June_2026.pdf', { type: 'application/pdf' });
+      processFile(file);
+    } catch (err) {
+      console.error(err);
+      alert('Error loading test PDF: ' + err.message);
+      btnLoadTestPdf.innerText = 'Load Test PDF';
+      btnLoadTestPdf.disabled = false;
+    }
+  });
+
   fileInput.addEventListener('change', handleFileSelection);
 
   dropzone.addEventListener('dragover', (e) => {
@@ -105,7 +132,7 @@ export function initCompress(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
       
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       pageCount = pdf.numPages;
       fileMetaEl.innerText = `Pages: ${pageCount} | Current Size: ${formatBytes(file.size)}`;
       runBtn.disabled = false;
@@ -122,14 +149,14 @@ export function initCompress(container) {
     const level = radio ? radio.value : 'recommended';
     
     // Quality & Scale settings based on level
-    let scale = 1.5;
-    let jpegQuality = 0.6;
+    let scale = 1.1;
+    let jpegQuality = 0.5;
     if (level === 'extreme') {
-      scale = 1.0;
-      jpegQuality = 0.35;
+      scale = 0.8;
+      jpegQuality = 0.3;
     } else if (level === 'low') {
-      scale = 2.0;
-      jpegQuality = 0.85;
+      scale = 1.4;
+      jpegQuality = 0.65;
     }
 
     container.innerHTML = `
@@ -159,7 +186,7 @@ export function initCompress(container) {
       
       progressBar.style.width = '20%';
       
-      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdfjsDoc = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const pdfLibDoc = await window.PDFLib.PDFDocument.create();
       
       // 2. Process page-by-page

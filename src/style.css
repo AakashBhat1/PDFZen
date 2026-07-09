@@ -682,6 +682,16 @@ body.light-theme .form-control, body.light-theme select {
   background: rgba(0, 0, 0, 0.04);
 }
 
+select option {
+  background-color: #12121c;
+  color: #f1f1f6;
+}
+
+body.light-theme select option {
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
 .form-control:focus, select:focus {
   border-color: var(--primary-color);
 }

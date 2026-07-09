@@ -60,7 +60,7 @@ async function extractPDFText(arrayBuffer, progressCallback) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
   
-  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
   const numPages = pdf.numPages;
   const pagesText = []; // Array of arrays (lines of text)
 
@@ -833,7 +833,7 @@ export function initPdfToJpg(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
       
-      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const totalPages = pdf.numPages;
       const filesToZip = [];
 

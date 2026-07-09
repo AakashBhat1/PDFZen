@@ -14,6 +14,9 @@ export function initSplit(container) {
         <h4>Drag & Drop your PDF file here</h4>
         <p>or click to browse from your computer</p>
         <input type="file" id="split-file-input" class="file-input-hidden" accept="application/pdf">
+        <button id="btn-load-test-pdf" type="button" class="btn btn-secondary" style="margin-top: 1rem; pointer-events: auto;">
+          <i class="bi bi-file-earmark-pdf"></i> Load Test PDF
+        </button>
       </div>
       
       <div id="split-preview-container" style="display: none; margin-top: 1.5rem; width: 100%;">
@@ -38,10 +41,18 @@ export function initSplit(container) {
       </div>
 
       <!-- Range Options -->
-      <div id="split-range-options" class="form-group">
-        <label for="split-range-input">Page Range</label>
-        <input type="text" id="split-range-input" class="form-control" placeholder="e.g. 1-3, 5, 8-10" disabled>
-        <span class="form-help">Enter comma-separated page numbers or ranges.</span>
+      <div id="split-range-options" class="form-group" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <label>Custom Ranges</label>
+        <div id="split-ranges-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <!-- Dynamically populated range rows -->
+        </div>
+        <button id="btn-add-range" type="button" class="btn btn-secondary" style="width: 100%;" disabled>
+          <i class="bi bi-plus-lg"></i> Add Range
+        </button>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+          <input type="checkbox" id="split-merge-ranges" style="width: auto; cursor: pointer;" disabled>
+          <label for="split-merge-ranges" style="margin-bottom: 0; cursor: pointer; font-size: 0.85rem; user-select: none;">Merge all ranges in one PDF file</label>
+        </div>
       </div>
 
       <!-- Chunk Options -->
@@ -66,11 +77,37 @@ export function initSplit(container) {
   const splitMode = container.querySelector('#split-mode');
   const rangeOptions = container.querySelector('#split-range-options');
   const chunkOptions = container.querySelector('#split-chunk-options');
-  const rangeInput = container.querySelector('#split-range-input');
   const chunkInput = container.querySelector('#split-chunk-input');
+  const rangesContainer = container.querySelector('#split-ranges-container');
+  const btnAddRange = container.querySelector('#btn-add-range');
+  const mergeRangesCheckbox = container.querySelector('#split-merge-ranges');
+
+  const btnLoadTestPdf = container.querySelector('#btn-load-test-pdf');
 
   // Trigger file selection
-  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('click', (e) => {
+    // If they clicked the load test button, don't trigger file chooser
+    if (e.target.closest('#btn-load-test-pdf')) return;
+    fileInput.click();
+  });
+
+  btnLoadTestPdf.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      btnLoadTestPdf.innerText = 'Loading...';
+      btnLoadTestPdf.disabled = true;
+      const res = await fetch('/test/Visit report 030726 Yk-54.pdf');
+      if (!res.ok) throw new Error('Failed to fetch test PDF');
+      const blob = await res.blob();
+      const file = new File([blob], 'Visit report 030726 Yk-54.pdf', { type: 'application/pdf' });
+      processFile(file);
+    } catch (err) {
+      console.error(err);
+      alert('Error loading test PDF: ' + err.message);
+      btnLoadTestPdf.innerText = 'Load Test PDF';
+      btnLoadTestPdf.disabled = false;
+    }
+  });
 
   fileInput.addEventListener('change', handleFileSelection);
 
@@ -113,6 +150,61 @@ export function initSplit(container) {
     }
   });
 
+  function renderRangeRow(index, fromVal, toVal) {
+    const row = document.createElement('div');
+    row.className = 'range-row';
+    row.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;';
+    row.innerHTML = `
+      <span style="font-size: 0.8rem; color: var(--text-muted); min-width: 50px; white-space: nowrap;">Range ${index}:</span>
+      <input type="number" class="form-control range-from" style="padding: 0.4rem 0.5rem; text-align: center; width: 100%; min-width: 0;" value="${fromVal}" min="1" max="${pageCount}">
+      <span style="font-size: 0.85rem; color: var(--text-muted);">to</span>
+      <input type="number" class="form-control range-to" style="padding: 0.4rem 0.5rem; text-align: center; width: 100%; min-width: 0;" value="${toVal}" min="1" max="${pageCount}">
+      <button type="button" class="btn btn-danger btn-remove-range" style="padding: 0.4rem 0.6rem;" title="Remove Range">
+        <i class="bi bi-trash"></i>
+      </button>
+    `;
+    
+    const fromInput = row.querySelector('.range-from');
+    const toInput = row.querySelector('.range-to');
+    const removeBtn = row.querySelector('.btn-remove-range');
+
+    fromInput.addEventListener('change', () => {
+      let val = parseInt(fromInput.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > pageCount) val = pageCount;
+      fromInput.value = val;
+    });
+
+    toInput.addEventListener('change', () => {
+      let val = parseInt(toInput.value, 10);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > pageCount) val = pageCount;
+      toInput.value = val;
+    });
+
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      updateRangeLabels();
+    });
+
+    rangesContainer.appendChild(row);
+    updateRangeLabels();
+  }
+
+  function updateRangeLabels() {
+    const rows = rangesContainer.querySelectorAll('.range-row');
+    rows.forEach((row, idx) => {
+      row.querySelector('span').innerText = `Range ${idx + 1}:`;
+      const removeBtn = row.querySelector('.btn-remove-range');
+      removeBtn.disabled = (rows.length <= 1);
+    });
+  }
+
+  btnAddRange.addEventListener('click', () => {
+    const currentRows = rangesContainer.querySelectorAll('.range-row');
+    renderRangeRow(currentRows.length + 1, 1, pageCount);
+  });
+
   async function processFile(file) {
     if (file.type !== 'application/pdf') return;
     
@@ -128,15 +220,19 @@ export function initSplit(container) {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js');
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
       
-      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer) }).promise;
+      pdfDocInstance = await window.pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       pageCount = pdfDocInstance.numPages;
       fileMeta.innerText = `Pages: ${pageCount} | Size: ${formatBytes(file.size)}`;
       
       // Enable settings inputs
       runBtn.disabled = false;
-      rangeInput.disabled = false;
+      btnAddRange.disabled = false;
+      mergeRangesCheckbox.disabled = false;
       chunkInput.disabled = false;
-      rangeInput.placeholder = `e.g. 1-${pageCount}, ${Math.ceil(pageCount/2)}`;
+      
+      // Initialize first range row
+      rangesContainer.innerHTML = '';
+      renderRangeRow(1, 1, pageCount);
       
       // 2. Generate Page Thumbnails
       pagesGrid.innerHTML = '';
@@ -236,32 +332,106 @@ export function initSplit(container) {
       progressBar.style.width = '30%';
 
       if (mode === 'range') {
-        const rangeText = rangeInput.value.trim();
-        if (!rangeText) {
-          throw new Error('Please enter a valid page range.');
-        }
-        
-        progressText.innerText = 'Analyzing page indices...';
-        const pageIndices = parseRanges(rangeText, pageCount);
-        if (pageIndices.length === 0) {
-          throw new Error('No valid pages found in range.');
+        const rows = rangesContainer.querySelectorAll('.range-row');
+        if (rows.length === 0) {
+          throw new Error('Please add at least one range.');
         }
 
-        progressText.innerText = 'Copying page structures...';
-        progressBar.style.width = '50%';
-        
-        const newDoc = await PDFDocument.create();
-        const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
-        copiedPages.forEach(p => newDoc.addPage(p));
-        
-        progressText.innerText = 'Saving output PDF...';
-        progressBar.style.width = '80%';
-        const outputBytes = await newDoc.save();
-        progressBar.style.width = '100%';
+        const ranges = [];
+        for (const row of rows) {
+          const fromVal = parseInt(row.querySelector('.range-from').value, 10);
+          const toVal = parseInt(row.querySelector('.range-to').value, 10);
+          if (isNaN(fromVal) || isNaN(toVal) || fromVal < 1 || toVal < 1 || fromVal > pageCount || toVal > pageCount) {
+            throw new Error('Please enter valid page numbers for all ranges.');
+          }
+          ranges.push({ from: fromVal, to: toVal });
+        }
 
-        const outputName = selectedFile.name.replace(/\.pdf$/i, '') + '_extracted.pdf';
-        
-        showSuccessSingle(outputBytes, outputName);
+        const mergeAll = mergeRangesCheckbox.checked;
+
+        if (mergeAll) {
+          progressText.innerText = 'Copying pages for merged PDF...';
+          progressBar.style.width = '50%';
+          
+          const newDoc = await PDFDocument.create();
+          
+          // Collect all pages in order, allowing duplicates if specified
+          const pageIndices = [];
+          for (const r of ranges) {
+            const start = Math.min(r.from, r.to);
+            const end = Math.max(r.from, r.to);
+            for (let p = start; p <= end; p++) {
+              pageIndices.push(p - 1);
+            }
+          }
+
+          if (pageIndices.length === 0) {
+            throw new Error('No valid pages found in the specified ranges.');
+          }
+
+          const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
+          copiedPages.forEach(p => newDoc.addPage(p));
+
+          progressText.innerText = 'Saving merged PDF...';
+          progressBar.style.width = '80%';
+          const outputBytes = await newDoc.save();
+          progressBar.style.width = '100%';
+
+          const outputName = selectedFile.name.replace(/\.pdf$/i, '') + '_merged.pdf';
+          showSuccessSingle(outputBytes, outputName);
+
+        } else {
+          progressText.innerText = 'Creating separate PDFs for each range...';
+          progressBar.style.width = '40%';
+
+          const filesToZip = [];
+          
+          for (let idx = 0; idx < ranges.length; idx++) {
+            const r = ranges[idx];
+            const start = Math.min(r.from, r.to);
+            const end = Math.max(r.from, r.to);
+            
+            const chunkIndices = [];
+            for (let p = start; p <= end; p++) {
+              chunkIndices.push(p - 1);
+            }
+
+            if (chunkIndices.length === 0) continue;
+
+            progressText.innerText = `Generating range ${idx + 1} (${start}-${end})...`;
+            const percent = Math.floor(40 + (idx / ranges.length) * 40);
+            progressBar.style.width = `${percent}%`;
+
+            const newDoc = await PDFDocument.create();
+            const copiedPages = await newDoc.copyPages(srcDoc, chunkIndices);
+            copiedPages.forEach(p => newDoc.addPage(p));
+            
+            const bytes = await newDoc.save();
+            const rangeStr = `${start}-${end}`;
+            filesToZip.push({
+              name: `${selectedFile.name.replace(/\.pdf$/i, '')}-${rangeStr}.pdf`,
+              data: bytes
+            });
+          }
+
+          if (filesToZip.length === 0) {
+            throw new Error('No valid ranges could be created.');
+          }
+
+          if (filesToZip.length === 1) {
+            progressBar.style.width = '100%';
+            showSuccessSingle(filesToZip[0].data, filesToZip[0].name);
+          } else {
+            progressText.innerText = 'Bundling PDF files into a ZIP archive...';
+            progressBar.style.width = '90%';
+            
+            const zipName = selectedFile.name.replace(/\.pdf$/i, '') + '_split_ranges.zip';
+            await downloadZipOfFiles(filesToZip, zipName);
+            progressBar.style.width = '100%';
+            
+            showSuccessZip(zipName);
+          }
+        }
         
       } else if (mode === 'all') {
         // Split every page into separate files, compile in ZIP
