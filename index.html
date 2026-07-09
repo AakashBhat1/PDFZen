@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDFZen — Premium PDF & Document Suite</title>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <!-- App Styles -->
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Glow Elements for background aesthetic -->
+  <div class="glow-bg">
+    <div class="glow-1"></div>
+    <div class="glow-2"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area" id="btn-home">
+        <div class="logo-icon">
+          <i class="bi bi-file-earmark-pdf-fill"></i>
+        </div>
+        <span class="logo-text">PDFZen</span>
+      </div>
+
+      <div class="search-container">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text" id="tool-search" placeholder="Search 29 tools (e.g. merge, word, sign)..." autocomplete="off">
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-api-settings" class="btn btn-secondary" title="Configure AI Keys">
+          <i class="bi bi-cpu"></i> <span>Gemini Key</span>
+        </button>
+        <button id="theme-toggle" class="btn btn-icon" title="Toggle Light/Dark Theme">
+          <i class="bi bi-moon-stars"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+      <!-- Dashboard Mode -->
+      <div id="dashboard-view" class="view-panel active">
+        <!-- Categories Navbar -->
+        <nav class="categories-nav">
+          <button class="cat-btn active" data-category="all">All Tools</button>
+          <button class="cat-btn" data-category="organize">Organize & Optimize</button>
+          <button class="cat-btn" data-category="convert-from">Convert from PDF</button>
+          <button class="cat-btn" data-category="convert-to">Convert to PDF</button>
+          <button class="cat-btn" data-category="edit">Edit & Sign</button>
+          <button class="cat-btn" data-category="security">Security & Repair</button>
+          <button class="cat-btn" data-category="ai">AI & Advanced</button>
+        </nav>
+
+        <!-- Tools Grid -->
+        <div class="tools-grid-container">
+          <!-- Organize & Optimize -->
+          <section class="tools-section" data-section="organize">
+            <h2 class="section-title">Organize & Optimize</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="merge" data-category="organize" data-tags="merge combine join append link concatenate">
+                <div class="tool-icon accent-purple"><i class="bi bi-file-earmark-plus"></i></div>
+                <h3>Merge PDF</h3>
+                <p>Combine PDFs in the order you want with the easiest PDF merger available.</p>
+              </div>
+              <div class="tool-card" data-tool="split" data-category="organize" data-tags="split separate extract divide cut">
+                <div class="tool-icon accent-blue"><i class="bi bi-scissors"></i></div>
+                <h3>Split PDF</h3>
+                <p>Separate one page or a whole set for easy conversion into independent PDF files.</p>
+              </div>
+              <div class="tool-card" data-tool="compress" data-category="organize" data-tags="compress shrink reduce optimize size">
+                <div class="tool-icon accent-green"><i class="bi bi-file-earmark-zip"></i></div>
+                <h3>Compress PDF</h3>
+                <p>Reduce file size while optimizing for maximal PDF quality.</p>
+              </div>
+              <div class="tool-card" data-tool="organize" data-category="organize" data-tags="organize sort pages delete insert duplicate reorder">
+                <div class="tool-icon accent-orange"><i class="bi bi-grid-3x3-gap"></i></div>
+                <h3>Organize PDF</h3>
+                <p>Sort pages of your PDF file however you like. Delete or add PDF pages.</p>
+              </div>
+              <div class="tool-card" data-tool="rotate" data-category="organize" data-tags="rotate spin orientation landscape portrait">
+                <div class="tool-icon accent-pink"><i class="bi bi-arrow-clockwise"></i></div>
+                <h3>Rotate PDF</h3>
+                <p>Rotate your PDFs the way you need them. Rotate multiple PDFs at once!</p>
+              </div>
+              <div class="tool-card" data-tool="crop" data-category="organize" data-tags="crop margin trim adjust cut size border">
+                <div class="tool-icon accent-indigo"><i class="bi bi-crop"></i></div>
+                <h3>Crop PDF</h3>
+                <p>Crop margins of PDF documents or select specific areas for one or all pages.</p>
+              </div>
+              <div class="tool-card" data-tool="pagenumbers" data-category="organize" data-tags="page numbers count stamp header footer numbering">
+                <div class="tool-icon accent-teal"><i class="bi bi-hash"></i></div>
+                <h3>Page Numbers</h3>
+                <p>Add page numbers into PDFs with ease. Choose positions, dimension, typography.</p>
+              </div>
+              <div class="tool-card" data-tool="watermark" data-category="organize" data-tags="watermark stamp text image opacity draft confidential">
+                <div class="tool-icon accent-red"><i class="bi bi-textarea-t"></i></div>
+                <h3>Watermark</h3>
+                <p>Stamp an image or text over your PDF in seconds. Choose position and transparency.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Convert From PDF -->
+          <section class="tools-section" data-section="convert-from">
+            <h2 class="section-title">Convert From PDF</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="pdf-to-word" data-category="convert-from" data-tags="pdf to word doc docx convert office">
+                <div class="tool-icon accent-blue"><i class="bi bi-filetype-docx"></i></div>
+                <h3>PDF to Word</h3>
+                <p>Easily convert your PDF files into easy to edit DOC and DOCX documents.</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-powerpoint" data-category="convert-from" data-tags="pdf to powerpoint ppt pptx slideshow convert office">
+                <div class="tool-icon accent-red"><i class="bi bi-filetype-pptx"></i></div>
+                <h3>PDF to PowerPoint</h3>
+                <p>Turn your PDF files into easy to edit PPT and PPTX slideshows.</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-excel" data-category="convert-from" data-tags="pdf to excel xls xlsx sheet spreadsheet convert table">
+                <div class="tool-icon accent-green"><i class="bi bi-filetype-xlsx"></i></div>
+                <h3>PDF to Excel</h3>
+                <p>Pull data straight from PDFs into Excel spreadsheets in a few short seconds.</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-jpg" data-category="convert-from" data-tags="pdf to jpg jpeg png image picture extract pictures">
+                <div class="tool-icon accent-teal"><i class="bi bi-images"></i></div>
+                <h3>PDF to JPG</h3>
+                <p>Convert each PDF page into a JPG or extract all images contained in a PDF.</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-markdown" data-category="convert-from" data-tags="pdf to markdown md markdown text notes llm">
+                <div class="tool-icon accent-purple"><i class="bi bi-filetype-md"></i></div>
+                <h3>PDF to Markdown</h3>
+                <p>Easily turn PDFs into Markdown files, preserving headings, lists, and tables.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Convert To PDF -->
+          <section class="tools-section" data-section="convert-to">
+            <h2 class="section-title">Convert To PDF</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="word-to-pdf" data-category="convert-to" data-tags="word doc docx to pdf convert office reader">
+                <div class="tool-icon accent-blue"><i class="bi bi-file-earmark-word"></i></div>
+                <h3>Word to PDF</h3>
+                <p>Make DOC and DOCX files easy to read by converting them to PDF.</p>
+              </div>
+              <div class="tool-card" data-tool="powerpoint-to-pdf" data-category="convert-to" data-tags="powerpoint ppt pptx to pdf convert office presentation">
+                <div class="tool-icon accent-red"><i class="bi bi-file-earmark-ppt"></i></div>
+                <h3>PowerPoint to PDF</h3>
+                <p>Make PPT and PPTX slideshows easy to view by converting them to PDF.</p>
+              </div>
+              <div class="tool-card" data-tool="excel-to-pdf" data-category="convert-to" data-tags="excel xls xlsx to pdf convert spreadsheet sheet table">
+                <div class="tool-icon accent-green"><i class="bi bi-file-earmark-excel"></i></div>
+                <h3>Excel to PDF</h3>
+                <p>Make EXCEL spreadsheets easy to read by converting them to PDF.</p>
+              </div>
+              <div class="tool-card" data-tool="jpg-to-pdf" data-category="convert-to" data-tags="jpg jpeg png image to pdf convert photo layout margins">
+                <div class="tool-icon accent-teal"><i class="bi bi-file-earmark-image"></i></div>
+                <h3>JPG to PDF</h3>
+                <p>Convert JPG/PNG images to PDF. Easily adjust orientation and margins.</p>
+              </div>
+              <div class="tool-card" data-tool="html-to-pdf" data-category="convert-to" data-tags="html webpage url web page link website to pdf convert">
+                <div class="tool-icon accent-orange"><i class="bi bi-globe"></i></div>
+                <h3>HTML to PDF</h3>
+                <p>Convert webpages in HTML to PDF. Copy and paste the URL or raw HTML code.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Edit & Sign -->
+          <section class="tools-section" data-section="edit">
+            <h2 class="section-title">Edit & Sign</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="edit-pdf" data-category="edit" data-tags="edit add text write draw annotate font shapes paint">
+                <div class="tool-icon accent-purple"><i class="bi bi-pencil-square"></i></div>
+                <h3>Edit PDF</h3>
+                <p>Add text, images, shapes or freehand annotations to a PDF document.</p>
+              </div>
+              <div class="tool-card" data-tool="sign" data-category="edit" data-tags="sign pdf digital signature draw signature e-sign write signature">
+                <div class="tool-icon accent-indigo"><i class="bi bi-pen"></i></div>
+                <h3>Sign PDF</h3>
+                <p>Sign yourself or request electronic signatures from others securely.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Security & Repair -->
+          <section class="tools-section" data-section="security">
+            <h2 class="section-title">Security & Repair</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="unlock" data-category="security" data-tags="unlock remove password decryption security bypass restriction">
+                <div class="tool-icon accent-green"><i class="bi bi-unlock"></i></div>
+                <h3>Unlock PDF</h3>
+                <p>Remove PDF password security, giving you the freedom to use PDFs as you want.</p>
+              </div>
+              <div class="tool-card" data-tool="protect" data-category="security" data-tags="protect encrypt password security lock encrypt pdf restrictions">
+                <div class="tool-icon accent-red"><i class="bi bi-shield-lock"></i></div>
+                <h3>Protect PDF</h3>
+                <p>Protect PDF files with a password. Encrypt documents to prevent access.</p>
+              </div>
+              <div class="tool-card" data-tool="redact" data-category="security" data-tags="redact black box remove sensitive hide blur secure erase text">
+                <div class="tool-icon accent-dark"><i class="bi bi-eye-slash"></i></div>
+                <h3>Redact PDF</h3>
+                <p>Redact text and graphics to permanently remove sensitive information.</p>
+              </div>
+              <div class="tool-card" data-tool="repair" data-category="security" data-tags="repair fix corrupt broken restore scan salvage damaged">
+                <div class="tool-icon accent-orange"><i class="bi bi-tools"></i></div>
+                <h3>Repair PDF</h3>
+                <p>Repair a damaged PDF and recover data from a corrupt PDF file structure.</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-a" data-category="security" data-tags="pdf/a archive long term standard iso metadata">
+                <div class="tool-icon accent-blue"><i class="bi bi-archive"></i></div>
+                <h3>PDF to PDF/A</h3>
+                <p>Transform your PDF to PDF/A, the ISO standard for long-term archiving.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- AI & Advanced -->
+          <section class="tools-section" data-section="ai">
+            <h2 class="section-title">AI & Advanced</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="ai-summarizer" data-category="ai" data-tags="ai summarizer summary article keypoints essay gemini smart">
+                <div class="tool-icon accent-indigo"><i class="bi bi-stars"></i></div>
+                <h3>AI Summarizer</h3>
+                <p>Quickly generate concise summaries, outlines, and key points from articles.</p>
+              </div>
+              <div class="tool-card" data-tool="translate" data-category="ai" data-tags="translate ai translator foreign language gemini text convert">
+                <div class="tool-icon accent-purple"><i class="bi bi-translate"></i></div>
+                <h3>Translate PDF</h3>
+                <p>Easily translate PDF files powered by AI while keeping layout formatting.</p>
+              </div>
+              <div class="tool-card" data-tool="ocr" data-category="ai" data-tags="ocr scan text recognition image to text copyable searchable">
+                <div class="tool-icon accent-green"><i class="bi bi-search-heart"></i></div>
+                <h3>OCR PDF</h3>
+                <p>Convert scanned PDFs into searchable, selectable, and copyable documents.</p>
+              </div>
+              <div class="tool-card" data-tool="compare" data-category="ai" data-tags="compare documents diff side-by-side spot changes visual text diff">
+                <div class="tool-icon accent-pink"><i class="bi bi-layout-split"></i></div>
+                <h3>Compare PDF</h3>
+                <p>Show a side-by-side document comparison and easily spot text modifications.</p>
+              </div>
+              <div class="tool-card" data-tool="forms" data-category="ai" data-tags="pdf forms fill form fields create forms interactive checkbox textfield">
+                <div class="tool-icon accent-teal"><i class="bi bi-input-cursor-text"></i></div>
+                <h3>PDF Forms</h3>
+                <p>Detect fields automatically, fill PDF forms, or design interactive sheets.</p>
+              </div>
+              <div class="tool-card" data-tool="scan" data-category="ai" data-tags="scan camera capture webcam filter mobile photo scan document">
+                <div class="tool-icon accent-orange"><i class="bi bi-camera"></i></div>
+                <h3>Scan to PDF</h3>
+                <p>Capture document scans from your webcam and compile them into a PDF.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Workspace View (Dynamically Injected Content) -->
+      <div id="workspace-view" class="view-panel">
+        <div class="workspace-header">
+          <button id="btn-back-dashboard" class="btn btn-link">
+            <i class="bi bi-arrow-left"></i> Back to Tools
+          </button>
+          <h2 id="workspace-title">Tool Name</h2>
+        </div>
+        <div class="workspace-body" id="workspace-container">
+          <!-- Dynamic contents are loaded here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Global Settings (Gemini API Key Modal) -->
+  <div id="modal-settings" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="bi bi-cpu"></i> Gemini AI Configuration</h3>
+        <button class="modal-close" id="settings-close"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>To enable the **AI Summarizer** and **Translate PDF** features, please provide a Gemini API Key. Your key is stored locally in your browser and is sent directly to Google APIs.</p>
+        <div class="form-group">
+          <label for="gemini-key-input">Gemini API Key</label>
+          <div class="input-with-button">
+            <input type="password" id="gemini-key-input" placeholder="AIzaSy...">
+            <button id="btn-toggle-key-visibility" class="btn btn-icon-small"><i class="bi bi-eye"></i></button>
+          </div>
+          <span class="form-help">No key? The app will operate in a simulated mockup mode for demonstration.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-clear-settings" class="btn btn-danger">Clear Key</button>
+        <button id="btn-save-settings" class="btn btn-primary">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main scripts -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
