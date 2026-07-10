@@ -4,29 +4,32 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 
 ## Key Features
 
-### 1. Organize & Optimize
-*   **Merge PDF**: Combine multiple PDFs into a single file in the exact order you want.
-*   **Split PDF**: Extract specific pages/ranges, split in page-sized chunks, or split every page into a ZIP archive.
-*   **Compress PDF**: Reduce file size while optimizing quality by downsampling page canvas sizes and re-saving them as compressed JPEG overlays.
-*   **Organize PDF**: Visual thumbnail page editor. Drag-and-drop to sort, duplicate pages, delete pages, or insert blank sheets.
-*   **Rotate PDF**: Rotate individual pages or batch rotate all pages at once.
-*   **Crop PDF**: Adjust page crop bounding box margins visually.
-*   **Page Numbers**: Stamp numbering counts into page headers or footers with custom formatting.
-*   **Watermark**: Overlay transparent text stamps or logo images onto page layers.
+> [!NOTE]
+> We are actively launching features! The **Organize & Optimize** suite and **PDF to Word** converter are fully functional. The remaining tools are currently in progress and will be active in a few days.
+
+### 1. Organize & Optimize (✓ Active)
+*   **Merge PDF** `[Active]`: Combine multiple PDFs into a single file in the exact order you want.
+*   **Split PDF** `[Active]`: Extract specific pages/ranges, split in page-sized chunks, or split every page into a ZIP archive.
+*   **Compress PDF** `[Active]`: Reduce file size while optimizing quality by downsampling page canvas sizes and re-saving them as compressed JPEG overlays.
+*   **Organize PDF** `[Active]`: Visual thumbnail page editor. Drag-and-drop to sort, duplicate pages, delete pages, or insert blank sheets.
+*   **Rotate PDF** `[Active]`: Rotate individual pages or batch rotate all pages at once.
+*   **Crop PDF** `[Active]`: Adjust page crop bounding box margins visually.
+*   **Page Numbers** `[Active]`: Stamp numbering counts into page headers or footers with custom formatting.
+*   **Watermark** `[Active]`: Overlay transparent text stamps or logo images onto page layers.
 
 ### 2. Document Conversions
-*   **PDF to Word**: Extract text content and structure it into Microsoft Word (.docx) paragraphs.
-*   **Word to PDF**: Convert DOCX to PDF by converting it to HTML via Mammoth.js and printing it via html2pdf.js.
-*   **PDF to Excel**: Parse table grids from PDF texts and compile them into Excel sheets (.xlsx).
-*   **Excel to PDF**: Convert spreadsheets to styled HTML tables and export them to PDF pages.
-*   **PDF to PowerPoint**: Generate Slide decks from extracted text headers using PptxGenJS.
-*   **PowerPoint to PDF**: Parse slide ZIP XML structures to layout HTML pages and print to PDF.
-*   **PDF to JPG**: Export each PDF page as an individual JPEG and package them into a ZIP file.
-*   **JPG to PDF**: Compile images into a PDF with margin and layout sizing settings.
-*   **PDF to Markdown**: Parse text formats into structural Markdown files (.md).
-*   **HTML to PDF**: Convert raw HTML markup or webpage links to PDF sheets.
+*   **PDF to Word** `[Active]`: Extract text content and structure it into Microsoft Word (.docx) paragraphs.
+*   **Word to PDF** `[In Progress]`: Convert DOCX to PDF by converting it to HTML via Mammoth.js and printing it via html2pdf.js.
+*   **PDF to Excel** `[In Progress]`: Parse table grids from PDF texts and compile them into Excel sheets (.xlsx).
+*   **Excel to PDF** `[In Progress]`: Convert spreadsheets to styled HTML tables and export them to PDF pages.
+*   **PDF to PowerPoint** `[In Progress]`: Generate Slide decks from extracted text headers using PptxGenJS.
+*   **PowerPoint to PDF** `[In Progress]`: Parse slide ZIP XML structures to layout HTML pages and print to PDF.
+*   **PDF to JPG** `[In Progress]`: Export each PDF page as an individual JPEG and package them into a ZIP file.
+*   **JPG to PDF** `[In Progress]`: Compile images into a PDF with margin and layout sizing settings.
+*   **PDF to Markdown** `[In Progress]`: Parse text formats into structural Markdown files (.md).
+*   **HTML to PDF** `[In Progress]`: Convert raw HTML markup or webpage links to PDF sheets.
 
-### 3. Edits & Security
+### 3. Edits & Security `[In Progress]`
 *   **Edit PDF**: Visual vector overlay drawing, freehand brushes, and typing text annotations.
 *   **Sign PDF**: Sign documents with a custom signatures drawing pad, drag, and resize overlays.
 *   **Unlock PDF**: Decrypt password-restricted PDFs on loading and save them password-free.
@@ -35,7 +38,7 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 *   **Repair PDF**: Salvage corrupted PDF structures and rebuild xref offset indices.
 *   **PDF to PDF/A**: Conformance metadata injection for ISO long-term archiving standards.
 
-### 4. Advanced & AI Features
+### 4. Advanced & AI Features `[In Progress]`
 *   **AI Summarizer**: Structural summaries, key points, and outlines powered by Gemini 1.5 Flash.
 *   **Translate PDF**: Translate document text formats directly into multiple languages using Gemini AI.
 *   **OCR PDF**: Optical Character Recognition on page canvases using Tesseract.js.
