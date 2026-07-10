@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import mammoth from 'mammoth';
 import html2pdf from 'html2pdf.js';
 
@@ -38,11 +38,14 @@ export function initWordToPdf(container) {
           <option value="0">No Margins (0 in)</option>
         </select>
       </div>
+      ${backendStatusFieldHTML('Start the local Python server with LibreOffice installed for high-fidelity conversion.')}
     `
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -57,6 +60,7 @@ export function initWordToPdf(container) {
     ui.fileMeta.innerText = 'File loaded. Click Convert below.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
@@ -65,6 +69,23 @@ export function initWordToPdf(container) {
     const pageSize = container.querySelector('#word-layout-size').value;
     const orientation = container.querySelector('#word-layout-orient').value;
     const margin = parseFloat(container.querySelector('#word-layout-margin').value);
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok && backend.libreoffice) {
+      const outputName = file.name.replace(/\.docx$/i, '') + '.pdf';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/word-to-pdf',
+        outName: outputName,
+        mime: 'application/pdf',
+        title: 'Word Converted to PDF!',
+        meta: `PDF file: <strong>${outputName}</strong> — Converted via local Python engine (LibreOffice)`,
+        icon: 'bi-file-earmark-pdf-fill',
+        progressText: 'Converting document (running LibreOffice)...',
+        onReload: () => initWordToPdf(container)
+      });
+      return;
+    }
 
     const progress = showProgressView(container, 'Loading conversion tools...');
     

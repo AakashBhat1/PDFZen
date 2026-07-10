@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import JSZip from 'jszip';
 import html2pdf from 'html2pdf.js';
 
@@ -12,11 +12,14 @@ export function initPowerpointToPdf(container) {
     inputType: 'powerpoint',
     icon: 'bi-file-ppt',
     fileIcon: 'bi-file-pdf',
-    multiple: false
+    multiple: false,
+    settingsHTML: backendStatusFieldHTML('Start the local Python server with LibreOffice installed for high-fidelity conversion.')
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -31,10 +34,29 @@ export function initPowerpointToPdf(container) {
     ui.fileMeta.innerText = 'PowerPoint loaded. Click Convert below.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok && backend.libreoffice) {
+      const outputName = file.name.replace(/\.pptx$|\.ppt$/i, '') + '.pdf';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/powerpoint-to-pdf',
+        outName: outputName,
+        mime: 'application/pdf',
+        title: 'PowerPoint Converted to PDF!',
+        meta: `PDF file: <strong>${outputName}</strong> — Converted via local Python engine (LibreOffice)`,
+        icon: 'bi-file-earmark-pdf-fill',
+        progressText: 'Converting slides (running LibreOffice)...',
+        onReload: () => initPowerpointToPdf(container)
+      });
+      return;
+    }
+
     const progress = showProgressView(container, 'Unpacking PowerPoint slides...');
     
     try {

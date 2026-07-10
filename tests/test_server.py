@@ -98,6 +98,58 @@ def test_convert_pdf_to_powerpoint_success(dummy_pdf_bytes):
             assert 'filename="test.pptx"' in response.headers["content-disposition"]
             assert response.content == b"dummy presentation"
 
+def test_convert_office_to_pdf_success():
+    client = TestClient(app)
+    # Test Word to PDF
+    files = {"file": ("test.docx", b"dummy word content", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    with tempfile.TemporaryDirectory() as temp_dir:
+        dummy_pdf = Path(temp_dir) / "test.pdf"
+        dummy_pdf.write_bytes(b"dummy pdf")
+        mock_convert = AsyncMock(return_value=dummy_pdf)
+        with patch("server.libreoffice_available", return_value=True), \
+             patch("backend.converters.office_to_pdf", new=mock_convert):
+            response = client.post("/convert/word-to-pdf", files=files)
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert 'filename="test.pdf"' in response.headers["content-disposition"]
+            assert response.content == b"dummy pdf"
+
+    # Test Excel to PDF
+    files = {"file": ("test.xlsx", b"dummy excel content", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    with tempfile.TemporaryDirectory() as temp_dir:
+        dummy_pdf = Path(temp_dir) / "test.pdf"
+        dummy_pdf.write_bytes(b"dummy pdf")
+        mock_convert = AsyncMock(return_value=dummy_pdf)
+        with patch("server.libreoffice_available", return_value=True), \
+             patch("backend.converters.office_to_pdf", new=mock_convert):
+            response = client.post("/convert/excel-to-pdf", files=files)
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert response.content == b"dummy pdf"
+
+    # Test PowerPoint to PDF
+    files = {"file": ("test.pptx", b"dummy pptx content", "application/vnd.openxmlformats-officedocument.presentationml.presentation")}
+    with tempfile.TemporaryDirectory() as temp_dir:
+        dummy_pdf = Path(temp_dir) / "test.pdf"
+        dummy_pdf.write_bytes(b"dummy pdf")
+        mock_convert = AsyncMock(return_value=dummy_pdf)
+        with patch("server.libreoffice_available", return_value=True), \
+             patch("backend.converters.office_to_pdf", new=mock_convert):
+            response = client.post("/convert/powerpoint-to-pdf", files=files)
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            assert response.content == b"dummy pdf"
+
+
+def test_convert_office_to_pdf_unavailable():
+    client = TestClient(app)
+    files = {"file": ("test.docx", b"dummy word content", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    with patch("server.libreoffice_available", return_value=False):
+        response = client.post("/convert/word-to-pdf", files=files)
+        assert response.status_code == 503
+        assert "LibreOffice is required" in response.json()["detail"]
+
+
 def test_empty_file_upload():
     client = TestClient(app)
     files = {"file": ("test.pdf", b"", "application/pdf")}

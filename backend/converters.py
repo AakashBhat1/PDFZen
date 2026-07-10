@@ -211,3 +211,8 @@ async def pdf_to_jpg(
     if not output_path.is_file():
         raise RuntimeError("PDF-to-JPG conversion did not produce an output file.")
     return output_path
+
+
+async def office_to_pdf(input_path: str | Path, out_dir: str | Path) -> Path:
+    """Office document (DOCX/XLSX/PPTX) -> PDF via LibreOffice."""
+    return await libreoffice.convert(input_path, "pdf", out_dir=out_dir)

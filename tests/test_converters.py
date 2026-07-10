@@ -123,3 +123,42 @@ async def test_pdf_to_powerpoint_missing_soffice(dummy_pdf_path):
         with pytest.raises(LibreOfficeError) as exc_info:
             await converters.pdf_to_powerpoint(dummy_pdf_path, out_dir)
         assert "soffice) was not found" in str(exc_info.value)
+
+
+@pytest.mark.anyio
+async def test_office_to_pdf_mocked(tmp_path):
+    # Create dummy input document
+    input_doc = tmp_path / "test.docx"
+    input_doc.write_bytes(b"dummy docx")
+    
+    # We create a dummy file to represent soffice executable so validate_command passes
+    dummy_soffice = tmp_path / "soffice.exe"
+    dummy_soffice.write_bytes(b"")
+    
+    expected_pdf = tmp_path / "test.pdf"
+    
+    async def mock_run(cmd, tool, timeout_s=None):
+        # Touch expected output file to simulate successful conversion
+        expected_pdf.write_bytes(b"dummy pdf output")
+        return CompletedProc(returncode=0, stdout=b"", stderr=b"")
+        
+    with patch("backend.libreoffice.get_soffice_path", return_value=str(dummy_soffice)), \
+         patch("backend.process_executor.run", new=AsyncMock(side_effect=mock_run)):
+         
+        result_path = await converters.office_to_pdf(input_doc, tmp_path)
+        assert result_path == expected_pdf
+        assert result_path.is_file()
+        assert result_path.read_text() == "dummy pdf output"
+        result_path.unlink()
+        
+    dummy_soffice.unlink()
+
+
+@pytest.mark.anyio
+async def test_office_to_pdf_missing_soffice(tmp_path):
+    input_doc = tmp_path / "test.docx"
+    input_doc.write_bytes(b"dummy docx")
+    with patch("backend.libreoffice.get_soffice_path", return_value=None):
+        with pytest.raises(LibreOfficeError) as exc_info:
+            await converters.office_to_pdf(input_doc, tmp_path)
+        assert "soffice) was not found" in str(exc_info.value)

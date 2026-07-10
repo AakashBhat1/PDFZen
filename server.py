@@ -161,6 +161,42 @@ async def convert_pdf_to_jpg(file: UploadFile = File(...), dpi: int = Form(200))
     )
 
 
+@app.post("/convert/word-to-pdf")
+async def convert_word_to_pdf(file: UploadFile = File(...)):
+    if not libreoffice_available():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "LibreOffice is required for Word-to-PDF but was not found."},
+        )
+    return await _run_conversion(
+        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    )
+
+
+@app.post("/convert/excel-to-pdf")
+async def convert_excel_to_pdf(file: UploadFile = File(...)):
+    if not libreoffice_available():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "LibreOffice is required for Excel-to-PDF but was not found."},
+        )
+    return await _run_conversion(
+        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    )
+
+
+@app.post("/convert/powerpoint-to-pdf")
+async def convert_powerpoint_to_pdf(file: UploadFile = File(...)):
+    if not libreoffice_available():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "LibreOffice is required for PowerPoint-to-PDF but was not found."},
+        )
+    return await _run_conversion(
+        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
 

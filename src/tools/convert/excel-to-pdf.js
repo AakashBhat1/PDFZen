@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import * as XLSX from 'xlsx';
 import html2pdf from 'html2pdf.js';
 
@@ -38,11 +38,14 @@ export function initExcelToPdf(container) {
           <option value="0">No Margins (0 in)</option>
         </select>
       </div>
+      ${backendStatusFieldHTML('Start the local Python server with LibreOffice installed for high-fidelity conversion.')}
     `
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -57,6 +60,7 @@ export function initExcelToPdf(container) {
     ui.fileMeta.innerText = 'Spreadsheet parsed. Ready to print.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
@@ -65,6 +69,23 @@ export function initExcelToPdf(container) {
     const pageSize = container.querySelector('#excel-layout-size').value;
     const orientation = container.querySelector('#excel-layout-orient').value;
     const margin = parseFloat(container.querySelector('#excel-layout-margin').value);
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok && backend.libreoffice) {
+      const outputName = file.name.replace(/\.xlsx$|\.xls$/i, '') + '.pdf';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/excel-to-pdf',
+        outName: outputName,
+        mime: 'application/pdf',
+        title: 'Excel Converted to PDF!',
+        meta: `PDF document: <strong>${outputName}</strong> — Converted via local Python engine (LibreOffice)`,
+        icon: 'bi-file-earmark-pdf-fill',
+        progressText: 'Converting spreadsheet (running LibreOffice)...',
+        onReload: () => initExcelToPdf(container)
+      });
+      return;
+    }
 
     const progress = showProgressView(container, 'Parsing Excel workbook...');
     
