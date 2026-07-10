@@ -178,11 +178,13 @@ body.light-theme ::-webkit-scrollbar-thumb {
   font-size: 1.5rem;
   background: linear-gradient(to right, #ffffff, #d8b4fe);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 body.light-theme .logo-text {
   background: linear-gradient(to right, #1f2937, #6366f1);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
