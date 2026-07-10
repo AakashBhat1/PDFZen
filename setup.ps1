@@ -112,6 +112,52 @@ if (Test-CommandExists "uv") {
     Write-Warning "uv command not found. Please verify Astral uv installation."
 }
 
+# --------------------------------------------------
+# 5. Check and optionally install LibreOffice (for PowerPoint conversions)
+# --------------------------------------------------
+Write-Host "`n--------------------------------------------------" -ForegroundColor Cyan
+Write-Host "Checking for LibreOffice..." -ForegroundColor Cyan
+Write-Host "--------------------------------------------------" -ForegroundColor Cyan
+
+$sofficeInstalled = $false
+$sofficePath = $null
+if ($env:SOFFICE_PATH -and (Test-Path $env:SOFFICE_PATH)) {
+    $sofficeInstalled = $true
+    $sofficePath = $env:SOFFICE_PATH
+} elseif (Test-CommandExists "soffice") {
+    $sofficeInstalled = $true
+} else {
+    $commonPaths = @(
+        "C:\Program Files\LibreOffice\program\soffice.exe",
+        "C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+    )
+    foreach ($p in $commonPaths) {
+        if (Test-Path $p) {
+            $sofficeInstalled = $true
+            $sofficePath = $p
+            break
+        }
+    }
+}
+
+if ($sofficeInstalled) {
+    Write-Host "[OK] LibreOffice is already installed." -ForegroundColor Green
+} else {
+    Write-Host "[!] LibreOffice is missing. It is required for high-fidelity PowerPoint conversion." -ForegroundColor Yellow
+    if ($hasWinget) {
+        Write-Host "Installing LibreOffice via winget (this might take a few minutes, UAC elevation may be requested)..." -ForegroundColor Cyan
+        winget install TheDocumentFoundation.LibreOffice --source winget --accept-package-agreements --accept-source-agreements --silent
+        Add-ToPath "C:\Program Files\LibreOffice\program"
+        if (Test-Path "C:\Program Files\LibreOffice\program\soffice.exe") {
+            Write-Host "[OK] LibreOffice successfully installed." -ForegroundColor Green
+        } else {
+            Write-Warning "LibreOffice installer finished, but soffice.exe was not found at standard path."
+        }
+    } else {
+        Write-Warning "winget not found. Please install LibreOffice manually from https://www.libreoffice.org/ to enable PowerPoint conversions."
+    }
+}
+
 Write-Host "`n==================================================" -ForegroundColor Green
 Write-Host "Setup completed! You are ready to start PDFZen." -ForegroundColor Green
 Write-Host "Use 'start.bat' to launch the frontend & backend." -ForegroundColor Green
