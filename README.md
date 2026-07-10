@@ -64,18 +64,47 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 
 ## Installation & Setup
 
-1.  **Clone/Open project**: Ensure you are in the project folder containing `package.json`.
-2.  **Install dependencies**:
+### Option 1: One-Click Windows Setup (Recommended)
+
+If you are on Windows, we provide automated scripts to configure your environment:
+
+1. **Run Setup**: Double-click `setup.bat` (or run it in your terminal). This script automatically:
+   - Checks for and installs Node.js and Astral `uv` if they are missing.
+   - Installs all frontend dependencies (`npm install`).
+   - Downloads Python 3.13 and synchronizes the backend virtual environment (`uv sync`).
+2. **Start the Application**: Double-click `start.bat` (or run it in your terminal). This starts both the frontend and backend servers concurrently and automatically opens `http://localhost:3000/` in your browser.
+
+### Option 2: Manual Setup (Cross-Platform)
+
+If you prefer manual setup or are on a non-Windows platform:
+
+1.  **Install Runtimes**: Ensure you have Node.js and Python (>=3.13) or `uv` installed.
+2.  **Setup Frontend**:
     ```bash
     npm install
     ```
-3.  **Start Development Server**:
+3.  **Setup Backend**:
     ```bash
-    npm run dev
+    uv sync
     ```
-    This will open the dashboard locally at `http://localhost:3000/`.
-4.  **Build Production Bundle**:
-    ```bash
-    npm run build
-    ```
-    The compiled bundle will be outputted to `/dist` and is ready for static deployment (e.g. GitHub Pages or Vercel).
+4.  **Start Servers**:
+    *   Start Backend:
+        ```bash
+        uv run server.py
+        ```
+    *   Start Frontend:
+        ```bash
+        npm run dev
+        ```
+        This will open the dashboard locally at `http://localhost:3000/`.
+
+---
+
+## Production Deployment
+
+To compile the static production assets for the frontend:
+```bash
+npm run build
+```
+The compiled bundle will be outputted to `/dist` and is ready for static deployment (e.g. GitHub Pages or Vercel).
+

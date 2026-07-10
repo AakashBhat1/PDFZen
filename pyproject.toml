@@ -4,4 +4,13 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "pdf2docx>=0.5.13",
+    "pdfplumber>=0.11.0",
+    "pandas>=2.2.0",
+    "openpyxl>=3.1.0",
+    "python-multipart>=0.0.19",
+    "pymupdf>=1.24.0"
+]
