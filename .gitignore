@@ -39,3 +39,5 @@ yarn-debug.log*
 yarn-error.log*
 test
 docs
+.agents
+.playwright-mcp

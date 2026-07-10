@@ -60,6 +60,16 @@ export function initCompress(container) {
         </label>
       </div>
 
+      <div class="form-group" style="margin-top: 1rem; border-top: 1px solid var(--border-card); padding-top: 1rem;">
+        <label style="display:flex; gap:0.5rem; align-items:center; font-weight:normal; cursor:pointer;">
+          <input type="checkbox" id="comp-grayscale">
+          <div>
+            <strong>Convert to Grayscale</strong>
+            <div style="font-size:0.75rem; color:var(--text-muted)">Strip color channels to reduce PDF size further.</div>
+          </div>
+        </label>
+      </div>
+
       <button id="btn-run-compress" class="btn btn-primary" style="width: 100%; margin-top: 1rem;" disabled>
         <i class="bi bi-file-earmark-zip"></i> Compress PDF
       </button>
@@ -148,6 +158,7 @@ export function initCompress(container) {
     
     const radio = container.querySelector('input[name="comp-level"]:checked');
     const level = radio ? radio.value : 'recommended';
+    const grayscale = container.querySelector('#comp-grayscale').checked;
     
     // Quality & Scale settings based on level
     let scale = 1.1;
@@ -190,6 +201,23 @@ export function initCompress(container) {
         // Render PDF page to Canvas
         const page = await pdfjsDoc.getPage(i);
         const canvas = await renderPDFPageToCanvas(page, scale);
+        
+        if (grayscale) {
+          const ctx = canvas.getContext('2d');
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          for (let j = 0; j < data.length; j += 4) {
+            const r = data[j];
+            const g = data[j+1];
+            const b = data[j+2];
+            // NTSC luma formula for standard grayscale conversion
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            data[j] = gray;
+            data[j+1] = gray;
+            data[j+2] = gray;
+          }
+          ctx.putImageData(imgData, 0, 0);
+        }
         
         // Downsample/Compress Canvas to JPEG Blob
         const blob = await canvasToBlob(canvas, 'image/jpeg', jpegQuality);

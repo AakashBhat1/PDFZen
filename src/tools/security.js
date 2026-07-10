@@ -1,5 +1,5 @@
 import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, PDFName, PDFDict } from 'pdf-lib';
 import { PDFDocument as CantooPDFDocument } from '@cantoo/pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
@@ -219,8 +219,16 @@ export function initRedact(container) {
 
   ui.settingsFields.innerHTML = `
     <div class="form-group">
+      <label for="redact-color">Redaction Color</label>
+      <select id="redact-color" class="form-control" style="margin-bottom:0.75rem;">
+        <option value="black" selected>Black (Standard)</option>
+        <option value="red">Red (Warning/Review)</option>
+        <option value="white">White (Erase/White-out)</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Redaction Areas</label>
-      <span class="form-help">Click and drag over sensitive content to draw black redaction boxes.</span>
+      <span class="form-help">Click and drag over sensitive content to draw redaction boxes.</span>
       <button id="btn-clear-redactions" class="btn btn-secondary" style="width:100%; margin-top:0.5rem;" disabled>
         <i class="bi bi-trash"></i> Clear All Boxes
       </button>
@@ -265,6 +273,12 @@ export function initRedact(container) {
       ui.redactRoot.appendChild(wrapper);
       
       setupRedactEvents(overlay);
+      
+      const colorSelect = ui.settingsFields.querySelector('#redact-color');
+      colorSelect.addEventListener('change', () => {
+        redrawAllRedactions(overlay.getContext('2d'), overlay.width, overlay.height);
+      });
+
       ui.runBtn.disabled = false;
 
     } catch (err) {
@@ -322,9 +336,23 @@ export function initRedact(container) {
 
   function redrawAllRedactions(ctx, w, h) {
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#000000'; // Solid black redaction blocks
+    const colorVal = ui.settingsFields.querySelector('#redact-color').value;
+    
     redactionBoxes.forEach(box => {
-      ctx.fillRect(box.sx, box.sy, box.ex - box.sx, box.ey - box.sy);
+      if (colorVal === 'white') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(box.sx, box.sy, box.ex - box.sx, box.ey - box.sy);
+        // Draw thin gray border on preview canvas for white-out visibility
+        ctx.strokeStyle = '#cccccc';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(box.sx, box.sy, box.ex - box.sx, box.ey - box.sy);
+      } else if (colorVal === 'red') {
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(box.sx, box.sy, box.ex - box.sx, box.ey - box.sy);
+      } else {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(box.sx, box.sy, box.ex - box.sx, box.ey - box.sy);
+      }
     });
   }
 
@@ -353,10 +381,14 @@ export function initRedact(container) {
       const ry = pageH / pageCanvas.height;
 
       // Draw redaction boxes on PDF coordinates
+      const colorVal = ui.settingsFields.querySelector('#redact-color').value;
+      let fillRGB = rgb(0, 0, 0);
+      if (colorVal === 'red') fillRGB = rgb(0.93, 0.26, 0.26); // #ef4444
+      if (colorVal === 'white') fillRGB = rgb(1, 1, 1);       // #ffffff
+
       redactionBoxes.forEach(box => {
         const left = Math.min(box.sx, box.ex) * rx;
         const width = Math.abs(box.ex - box.sx) * rx;
-        const canvasTop = Math.min(box.sy, box.ey);
         const canvasBottom = Math.max(box.sy, box.ey);
         const height = Math.abs(box.ey - box.sy) * ry;
 
@@ -368,7 +400,7 @@ export function initRedact(container) {
           y: pdfY,
           width: width,
           height: height,
-          color: rgb(0, 0, 0)
+          color: fillRGB
         });
       });
 
@@ -408,6 +440,18 @@ export function initRedact(container) {
 export function initRepair(container) {
   const ui = createSecurityUI(container, 'Drag & Drop corrupted PDF here', 'Fix cross-reference tables and recover broken layouts', 'bi-tools', false);
 
+  ui.settingsFields.innerHTML = `
+    <div class="form-group">
+      <label style="display:flex; gap:0.5rem; align-items:center; font-weight:normal; cursor:pointer;">
+        <input type="checkbox" id="repair-sanitize">
+        <div>
+          <strong>Sanitize Document</strong>
+          <div style="font-size:0.75rem; color:var(--text-muted)">Strip JavaScript, metadata, attachments, and external links for security.</div>
+        </div>
+      </label>
+    </div>
+  `;
+
   let fileBuffer = null;
   let file = null;
 
@@ -427,35 +471,86 @@ export function initRepair(container) {
   }
 
   ui.runBtn.addEventListener('click', async () => {
+    const sanitize = container.querySelector('#repair-sanitize').checked;
+
     container.innerHTML = `
       <div class="workspace-main-panel" style="grid-column: span 2;">
         <div class="processing-container">
           <div class="spinner"></div>
-          <p class="processing-text">Rebuilding xref document tables...</p>
+          <p class="processing-text">${sanitize ? 'Sanitizing and repairing document...' : 'Rebuilding xref document tables...'}</p>
         </div>
       </div>
     `;
 
     try {
-
-
       // Loading with ignoreEncryption will skip errors and reconstruct file
       const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
-      const repairedBytes = await pdfDoc.save();
 
-      const outputName = file.name.replace(/\.pdf$/i, '') + '_repaired.pdf';
+      if (sanitize) {
+        // 1. Strip catalog-level actions & JavaScript
+        pdfDoc.catalog.delete(PDFName.of('OpenAction'));
+        pdfDoc.catalog.delete(PDFName.of('AA'));
+
+        const names = pdfDoc.catalog.get(PDFName.of('Names'));
+        if (names) {
+          const namesDict = pdfDoc.context.lookup(names);
+          if (namesDict && typeof namesDict.delete === 'function') {
+            namesDict.delete(PDFName.of('JavaScript'));
+            namesDict.delete(PDFName.of('EmbeddedFiles'));
+          }
+        }
+
+        // 2. Strip page-level actions & Link/Attachment annotations
+        const pages = pdfDoc.getPages();
+        pages.forEach(page => {
+          page.node.delete(PDFName.of('AA'));
+          
+          const annots = page.node.get(PDFName.of('Annots'));
+          if (annots) {
+            const arr = pdfDoc.context.lookup(annots);
+            if (arr && typeof arr.size === 'function') {
+              const newAnnots = [];
+              for (let i = 0; i < arr.size(); i++) {
+                const annot = arr.get(i);
+                const annotDict = pdfDoc.context.lookup(annot);
+                if (annotDict && typeof annotDict.get === 'function') {
+                  const subtype = annotDict.get(PDFName.of('Subtype'));
+                  const subtypeStr = subtype ? subtype.toString() : '';
+                  if (subtypeStr === '/Link' || subtypeStr === '/FileAttachment') {
+                    continue; // exclude links and files
+                  }
+                }
+                newAnnots.push(annot);
+              }
+              const newArray = pdfDoc.context.obj(newAnnots);
+              page.node.set(PDFName.of('Annots'), newArray);
+            }
+          }
+        });
+
+        // 3. Clear document metadata
+        pdfDoc.setTitle('');
+        pdfDoc.setAuthor('');
+        pdfDoc.setSubject('');
+        pdfDoc.setKeywords([]);
+        pdfDoc.setProducer('PDFZen Sanitizer');
+        pdfDoc.setCreator('PDFZen Suite');
+      }
+
+      const repairedBytes = await pdfDoc.save();
+      const outputName = file.name.replace(/\.pdf$/i, '') + (sanitize ? '_sanitized.pdf' : '_repaired.pdf');
 
       container.innerHTML = `
         <div class="workspace-main-panel" style="grid-column: span 2;">
           <div class="result-success-container">
-            <i class="bi bi-tools success-icon text-success"></i>
+            <i class="bi ${sanitize ? 'bi-shield-fill-check' : 'bi-tools'} success-icon text-success"></i>
             <div class="result-info">
-              <h3 class="result-title">PDF Structure Repaired!</h3>
-              <p class="result-meta">File rebuilt and downloaded. File: <strong>${outputName}</strong></p>
+              <h3 class="result-title">${sanitize ? 'PDF Sanitized and Repaired!' : 'PDF Structure Repaired!'}</h3>
+              <p class="result-meta">File rebuilt. File: <strong>${outputName}</strong></p>
             </div>
             <div style="display: flex; gap: 1rem; margin-top: 1rem;">
               <button id="btn-download-sec" class="btn btn-primary"><i class="bi bi-download"></i> Download PDF</button>
-              <button id="btn-sec-again" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Repair Another</button>
+              <button id="btn-sec-again" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Run Another</button>
             </div>
           </div>
         </div>
@@ -466,7 +561,7 @@ export function initRepair(container) {
 
     } catch (err) {
       console.error(err);
-      alert('Repair failed: ' + err.message);
+      alert('Operation failed: ' + err.message);
       initRepair(container);
     }
   });

@@ -12,7 +12,33 @@ export function initExcelToPdf(container) {
     inputType: 'excel',
     icon: 'bi-file-excel',
     fileIcon: 'bi-file-pdf',
-    multiple: false
+    multiple: false,
+    settingsHTML: `
+      <div class="form-group">
+        <label for="excel-layout-size">Page Size</label>
+        <select id="excel-layout-size" class="form-control">
+          <option value="letter">US Letter (8.5 x 11 in)</option>
+          <option value="a4">A4 (210 x 297 mm)</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 0.75rem;">
+        <label for="excel-layout-orient">Page Orientation</label>
+        <select id="excel-layout-orient" class="form-control">
+          <option value="landscape">Landscape</option>
+          <option value="portrait">Portrait</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 0.75rem;">
+        <label for="excel-layout-margin">Page Margin</label>
+        <select id="excel-layout-margin" class="form-control">
+          <option value="0.5">Normal (0.5 in)</option>
+          <option value="0.25">Narrow (0.25 in)</option>
+          <option value="0">No Margins (0 in)</option>
+        </select>
+      </div>
+    `
   });
 
   let fileBuffer = null;
@@ -35,6 +61,11 @@ export function initExcelToPdf(container) {
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
+    
+    const pageSize = container.querySelector('#excel-layout-size').value;
+    const orientation = container.querySelector('#excel-layout-orient').value;
+    const margin = parseFloat(container.querySelector('#excel-layout-margin').value);
+
     const progress = showProgressView(container, 'Parsing Excel workbook...');
     
     try {
@@ -65,7 +96,7 @@ export function initExcelToPdf(container) {
       progress.progressBar.style.width = '70%';
 
       const renderContainer = document.createElement('div');
-      renderContainer.style.cssText = 'padding: 40px; background:#fff; color:#333; font-family:sans-serif; font-size:11px;';
+      renderContainer.style.cssText = `padding: ${margin === 0 ? '0' : '40px'}; background:#fff; color:#333; font-family:sans-serif; font-size:11px;`;
       renderContainer.innerHTML = `
         <style>
           table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
@@ -84,12 +115,11 @@ export function initExcelToPdf(container) {
 
       const outputName = file.name.replace(/\.xlsx$|\.xls$/i, '') + '.pdf';
       const opt = {
-        margin: 0.5,
+        margin: margin,
         filename: outputName,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 1.5, useCORS: true },
-        // Render in landscape mode for sheets tables
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+        jsPDF: { unit: 'in', format: pageSize, orientation: orientation }
       };
 
       const pdfBlob = await html2pdf().set(opt).from(renderContainer).output('blob');

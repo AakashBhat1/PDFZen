@@ -1,5 +1,37 @@
 import { showSuccessView, showProgressView, showErrorView, downloadBlob } from './convert-shared.js';
+import { loadScript } from '../../utils.js';
 import html2pdf from 'html2pdf.js';
+
+// ==========================================
+// CUSTOM HTML SANITIZER (SSRF & XSS Prevention)
+// ==========================================
+function sanitizeHtml(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Remove dangerous executable / embed elements
+  const tagsToRemove = doc.querySelectorAll('script, iframe, object, embed, applet, form, meta, link');
+  tagsToRemove.forEach(tag => tag.remove());
+
+  // Scan all nodes for inline scripts or dangerous protocols
+  const allElements = doc.querySelectorAll('*');
+  const dangerousSchemes = /^\s*(file|gopher|ftp|javascript):/i;
+
+  allElements.forEach(el => {
+    // Strip inline event listeners (onclick, onload, etc.)
+    for (const attr of [...el.attributes]) {
+      if (attr.name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+      }
+      // Strip links or sources pointing to local files or other unsafe protocols
+      if ((attr.name === 'src' || attr.name === 'href' || attr.name === 'data') && dangerousSchemes.test(attr.value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+
+  return doc.body.innerHTML;
+}
 
 // ==========================================
 // HTML TO PDF
@@ -11,11 +43,12 @@ export function initHtmlToPdf(container) {
         <label for="html-input-mode">Input Mode</label>
         <select id="html-input-mode" class="form-control">
           <option value="code">Write/Paste Raw HTML Code</option>
+          <option value="markdown">Write/Paste Markdown Code</option>
           <option value="url">Convert URL (Via Proxy)</option>
         </select>
       </div>
 
-      <!-- Raw HTML Editor -->
+      <!-- Raw HTML / Markdown Editor -->
       <div id="html-editor-wrapper" class="form-group" style="margin-top: 1rem; flex: 1; display: flex; flex-direction: column;">
         <label for="html-code-area">HTML Code</label>
         <textarea id="html-code-area" class="form-control" style="flex: 1; font-family: monospace; font-size: 0.85rem; min-height: 250px; resize: vertical;" placeholder="<!DOCTYPE html><html><body><h1>Hello World</h1></body></html>"><h1>Welcome to PDFZen</h1><p>Type or paste your HTML here to convert it into a beautiful PDF.</p></textarea>
@@ -67,6 +100,19 @@ export function initHtmlToPdf(container) {
     if (val === 'code') {
       editorWrapper.style.display = 'flex';
       urlWrapper.style.display = 'none';
+      editorWrapper.querySelector('label').innerText = 'HTML Code';
+      codeArea.placeholder = '<!DOCTYPE html><html><body><h1>Hello World</h1></body></html>';
+      if (codeArea.value.trim() === '' || codeArea.value.includes('# Welcome to PDFZen')) {
+        codeArea.value = '<h1>Welcome to PDFZen</h1>\n<p>Type or paste your HTML here to convert it into a beautiful PDF.</p>';
+      }
+    } else if (val === 'markdown') {
+      editorWrapper.style.display = 'flex';
+      urlWrapper.style.display = 'none';
+      editorWrapper.querySelector('label').innerText = 'Markdown Code';
+      codeArea.placeholder = '# Heading 1\n\nWrite your markdown text here...';
+      if (codeArea.value.trim() === '' || codeArea.value.includes('Welcome to PDFZen')) {
+        codeArea.value = '# Welcome to PDFZen\n\nType or paste your Markdown here to convert it into a beautiful PDF.';
+      }
     } else {
       editorWrapper.style.display = 'none';
       urlWrapper.style.display = 'flex';
@@ -82,9 +128,24 @@ export function initHtmlToPdf(container) {
     let nameSuffix = 'webpage';
 
     if (mode === 'code') {
-      htmlContent = codeArea.value.trim();
-      if (!htmlContent) return alert('Please input some HTML content.');
+      const rawHtml = codeArea.value.trim();
+      if (!rawHtml) return alert('Please input some HTML content.');
+      htmlContent = sanitizeHtml(rawHtml);
       nameSuffix = 'markup';
+    } else if (mode === 'markdown') {
+      const markdown = codeArea.value.trim();
+      if (!markdown) return alert('Please input some Markdown content.');
+
+      const progress = showProgressView(container, 'Loading markdown compiler...');
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js');
+        const compiledHtml = typeof window.marked.parse === 'function' ? window.marked.parse(markdown) : window.marked(markdown);
+        htmlContent = sanitizeHtml(compiledHtml);
+        nameSuffix = 'markdown';
+      } catch (err) {
+        console.error(err);
+        return showErrorView(container, `Failed to compile Markdown: ${err.message}`, () => initHtmlToPdf(container));
+      }
     } else {
       const url = urlInput.value.trim();
       if (!url) return alert('Please enter a valid URL.');
@@ -98,27 +159,25 @@ export function initHtmlToPdf(container) {
         if (!response.ok) throw new Error('Webpage could not be fetched. Check the URL.');
         
         const data = await response.json();
-        htmlContent = data.contents;
+        htmlContent = sanitizeHtml(data.contents);
       } catch (err) {
         console.error(err);
         return showErrorView(container, `Failed to load URL contents: ${err.message}`, () => initHtmlToPdf(container));
       }
     }
 
-    const progress = showProgressView(container, 'Loading render tools...');
+    const progress = showProgressView(container, 'Generating PDF pages...');
     
     try {
-
-      
-      progress.progressText.innerText = 'Generating PDF pages...';
       progress.progressBar.style.width = '70%';
 
       const renderContainer = document.createElement('div');
       renderContainer.innerHTML = htmlContent;
       renderContainer.style.position = 'fixed';
       renderContainer.style.left = '-9999px';
-      // Basic print styles inside container
-      renderContainer.style.cssText = 'padding: 40px; background:#fff; color:#000; width: 800px;';
+      
+      // Basic styled wrapper inside container
+      renderContainer.style.cssText = 'padding: 40px; background:#fff; color:#000; width: 800px; font-family: sans-serif;';
       document.body.appendChild(renderContainer);
 
       const outputName = `${nameSuffix}_converted.pdf`;
@@ -135,7 +194,7 @@ export function initHtmlToPdf(container) {
       progress.progressBar.style.width = '100%';
 
       showSuccessView(container, {
-        title: 'HTML converted to PDF!',
+        title: 'HTML/Markdown converted to PDF!',
         meta: `PDF document: <strong>${outputName}</strong>`,
         icon: 'bi-file-earmark-pdf-fill',
         onDownload: () => downloadBlob(pdfBlob, outputName),

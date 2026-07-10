@@ -131,6 +131,36 @@ export function showSuccessView(container, options) {
   container.querySelector('#btn-convert-again').addEventListener('click', options.onReload);
 }
 
+// --- Object URL Manager for Memory Leak Prevention ---
+class ObjectUrlManager {
+  constructor() {
+    this.urls = new Set();
+  }
+
+  create(blobOrFile) {
+    const url = URL.createObjectURL(blobOrFile);
+    this.urls.add(url);
+    return url;
+  }
+
+  revoke(url) {
+    if (this.urls.has(url)) {
+      URL.revokeObjectURL(url);
+      this.urls.delete(url);
+    }
+  }
+
+  revokeAll() {
+    this.urls.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    this.urls.clear();
+  }
+}
+
+export const objectUrlManager = new ObjectUrlManager();
+
+
 // --- Showing Progress Panel Helper ---
 export function showProgressView(container, text) {
   container.innerHTML = `

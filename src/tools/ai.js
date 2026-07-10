@@ -359,7 +359,18 @@ export function initOcr(container) {
     subtitle: 'Extract text content client-side using Tesseract.js OCR',
     inputType: 'pdf',
     icon: 'bi-search-heart',
-    actionText: 'Execute OCR'
+    actionText: 'Execute OCR',
+    settingsHTML: `
+      <div class="form-group">
+        <label for="ocr-lang">Recognition Language</label>
+        <select id="ocr-lang" class="form-control">
+          <option value="eng" selected>English (eng)</option>
+          <option value="spa">Spanish (spa)</option>
+          <option value="fra">French (fra)</option>
+          <option value="deu">German (deu)</option>
+        </select>
+      </div>
+    `
   });
 
   let fileBuffer = null;
@@ -392,6 +403,7 @@ export function initOcr(container) {
   }
 
   ui.runBtn.addEventListener('click', async () => {
+    const lang = container.querySelector('#ocr-lang').value;
     ui.canvasContainer.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem; width:100%; padding:2rem 0;">
         <div class="spinner"></div>
@@ -403,28 +415,31 @@ export function initOcr(container) {
     try {
       const statusTxt = container.querySelector('#ocr-load-status');
       
-      // 2. Fetch PDF Page 1 canvas
-      statusTxt.innerText = 'Rendering page to image canvas...';
       const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
-      const page = await pdfDoc.getPage(1);
-      const canvas = await renderPDFPageToCanvas(page, 1.5); // high res for OCR accuracy
+      const totalPages = pdfDoc.numPages;
+      let fullOcrText = '';
 
-      // 3. Perform Tesseract OCR
-      statusTxt.innerText = 'Running Character Recognition (Page 1)...';
-      
-      const result = await Tesseract.recognize(canvas, 'eng', {
-        logger: m => {
-          if (m.status === 'recognizing') {
-            statusTxt.innerText = `Recognizing text... ${Math.floor(m.progress * 100)}%`;
+      for (let i = 1; i <= totalPages; i++) {
+        statusTxt.innerText = `Rendering page ${i} of ${totalPages} to image canvas...`;
+        const page = await pdfDoc.getPage(i);
+        const canvas = await renderPDFPageToCanvas(page, 1.5); // high res for OCR accuracy
+
+        statusTxt.innerText = `Running Character Recognition on page ${i} of ${totalPages}...`;
+        const result = await Tesseract.recognize(canvas, lang, {
+          logger: m => {
+            if (m.status === 'recognizing') {
+              statusTxt.innerText = `Page ${i}/${totalPages}: Recognizing text... ${Math.floor(m.progress * 100)}%`;
+            }
           }
-        }
-      });
-
-      const text = result.data.text;
+        });
+        
+        const text = result.data.text;
+        fullOcrText += `--- Page ${i} ---\n${text}\n\n`;
+      }
 
       ui.canvasContainer.innerHTML = '';
       ui.ocrTextResult.style.display = 'block';
-      ui.ocrTextResult.innerText = text || 'No characters recognized in document.';
+      ui.ocrTextResult.innerText = fullOcrText || 'No characters recognized in document.';
 
       // Append Download button
       const actionsDiv = document.createElement('div');
@@ -436,7 +451,7 @@ export function initOcr(container) {
       ui.ocrTextResult.appendChild(actionsDiv);
 
       actionsDiv.querySelector('#btn-download-ocr-txt').addEventListener('click', () => {
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const blob = new Blob([fullOcrText], { type: 'text/plain;charset=utf-8' });
         downloadBlob(blob, selectedFile.name.replace(/\.pdf$/i, '') + '_ocr.txt', 'text/plain');
       });
       actionsDiv.querySelector('#btn-ocr-again').addEventListener('click', () => initOcr(container));

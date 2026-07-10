@@ -1,16 +1,63 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, objectUrlManager } from './convert-shared.js';
 import { PDFDocument } from 'pdf-lib';
+import JSZip from 'jszip';
 
 // ==========================================
-// JPG TO PDF
+// JPG / PNG / CBZ TO PDF
 // ==========================================
+
+/**
+ * Ensure image is PNG or JPG for pdf-lib compatibility.
+ * Converts WebP or other browser-supported formats to PNG using a canvas.
+ */
+async function ensurePngOrJpg(item) {
+  if (item.file.type === 'image/png' || item.file.type === 'image/jpeg' || item.file.type === 'image/jpg') {
+    return item;
+  }
+  
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blob = new Blob([item.arrayBuffer], { type: item.file.type });
+    const url = URL.createObjectURL(blob);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(async (pngBlob) => {
+        if (!pngBlob) {
+          reject(new Error('Failed to convert image to PNG'));
+          return;
+        }
+        const buffer = await pngBlob.arrayBuffer();
+        resolve({
+          ...item,
+          file: { name: item.name.replace(/\.[^/.]+$/, '') + '.png', type: 'image/png' },
+          arrayBuffer: buffer
+        });
+      }, 'image/png');
+    };
+    
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image for conversion'));
+    };
+    
+    img.src = url;
+  });
+}
+
 export function initJpgToPdf(container) {
+  objectUrlManager.revokeAll();
   let images = []; // Array of { id, file, base64/buffer, name, sizeFormatted }
   let imageCounter = 0;
 
   const ui = createConvertUI(container, {
-    title: 'Drag & Drop JPG/PNG images here',
-    subtitle: 'Convert images to PDF in seconds. Easily adjust layout settings.',
+    title: 'Drag & Drop JPG/PNG images or Comic Book (.cbz) here',
+    subtitle: 'Convert images and comic book archives to PDF in seconds. Easily adjust layout settings.',
     inputType: 'image',
     icon: 'bi-images',
     fileIcon: 'bi-file-pdf',
@@ -45,6 +92,9 @@ export function initJpgToPdf(container) {
     `
   });
 
+  // Adjust input elements to accept .cbz files
+  ui.fileInput.accept = 'image/jpeg,image/png,image/webp,application/x-cbz,.cbz';
+
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', handleFiles);
 
@@ -66,18 +116,58 @@ export function initJpgToPdf(container) {
     ui.imgGrid.style.display = 'grid';
 
     for (const file of filesList) {
-      if (!file.type.startsWith('image/')) continue;
+      const isCbz = /\.cbz$/i.test(file.name) || file.type === 'application/x-cbz';
       
-      const buffer = await fileToArrayBuffer(file);
-      const url = URL.createObjectURL(file);
-      
-      images.push({
-        id: imageCounter++,
-        file: file,
-        arrayBuffer: buffer,
-        name: file.name,
-        url: url
-      });
+      if (isCbz) {
+        try {
+          const zip = await JSZip.loadAsync(file);
+          const imgEntries = [];
+          
+          zip.forEach((relativePath, entry) => {
+            if (!entry.dir && /\.(jpe?g|png|webp)$/i.test(entry.name)) {
+              imgEntries.push(entry);
+            }
+          });
+
+          // Sort image entries sequentially by file name
+          imgEntries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+          for (const entry of imgEntries) {
+            const buffer = await entry.async('arraybuffer');
+            const isPng = /\.png$/i.test(entry.name);
+            const isWebp = /\.webp$/i.test(entry.name);
+            
+            let mimeType = 'image/jpeg';
+            if (isPng) mimeType = 'image/png';
+            if (isWebp) mimeType = 'image/webp';
+
+            const blob = new Blob([buffer], { type: mimeType });
+            const url = objectUrlManager.create(blob);
+
+            images.push({
+              id: imageCounter++,
+              file: { name: entry.name, type: mimeType },
+              arrayBuffer: buffer,
+              name: entry.name,
+              url: url
+            });
+          }
+        } catch (e) {
+          console.error(e);
+          alert(`Failed to load CBZ comic archive: ${e.message}`);
+        }
+      } else if (file.type.startsWith('image/')) {
+        const buffer = await fileToArrayBuffer(file);
+        const url = objectUrlManager.create(file);
+        
+        images.push({
+          id: imageCounter++,
+          file: file,
+          arrayBuffer: buffer,
+          name: file.name,
+          url: url
+        });
+      }
     }
 
     updateImageGrid();
@@ -94,7 +184,7 @@ export function initJpgToPdf(container) {
     }
 
     ui.runBtn.disabled = false;
-    ui.fileMeta.innerText = `Uploaded: ${images.length} image(s)`;
+    ui.fileMeta.innerText = `Uploaded: ${images.length} image(s) / frames`;
 
     images.forEach((item, index) => {
       const card = document.createElement('div');
@@ -128,7 +218,7 @@ export function initJpgToPdf(container) {
 
   function removeImg(id) {
     const item = images.find(img => img.id === id);
-    if (item) URL.revokeObjectURL(item.url);
+    if (item) objectUrlManager.revoke(item.url);
     images = images.filter(img => img.id !== id);
     updateImageGrid();
   }
@@ -138,7 +228,6 @@ export function initJpgToPdf(container) {
     const progress = showProgressView(container, 'Loading PDF creation engine...');
 
     try {
-      
       const pdfDoc = await PDFDocument.create();
       
       const pageSizeSelect = container.querySelector('#jpg-layout-size').value;
@@ -151,9 +240,16 @@ export function initJpgToPdf(container) {
       if (marginSelect === 'large') margin = 40;
 
       for (let i = 0; i < images.length; i++) {
-        const item = images[i];
+        let item = images[i];
         progress.progressText.innerText = `Embedding image ${i + 1} of ${images.length}...`;
         progress.progressBar.style.width = `${10 + (i / images.length) * 80}%`;
+
+        // Ensure the format is supported by pdf-lib (convert WebP/others to PNG)
+        try {
+          item = await ensurePngOrJpg(item);
+        } catch (convErr) {
+          console.warn('Canvas conversion failed, attempting direct embed:', convErr);
+        }
 
         // Embed png or jpeg
         let embedImg;
@@ -182,7 +278,6 @@ export function initJpgToPdf(container) {
         if (pageSizeSelect !== 'fit') {
           const isLandscape = imgWidth > imgHeight;
           if (orientSelect === 'landscape' || (orientSelect === 'auto' && isLandscape)) {
-            // Swap page dimensions to landscape
             const temp = pageWidth;
             pageWidth = Math.max(pageWidth, pageHeight);
             pageHeight = Math.min(temp, pageHeight);
@@ -199,7 +294,7 @@ export function initJpgToPdf(container) {
 
         const page = pdfDoc.addPage([pageWidth, pageHeight]);
 
-        // Calculate Image Drawing size (best fit maintaining ratio within page and margins)
+        // Calculate Image Drawing size
         const maxWidth = pageWidth - margin * 2;
         const maxHeight = pageHeight - margin * 2;
         

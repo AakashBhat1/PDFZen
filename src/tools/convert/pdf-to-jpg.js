@@ -2,16 +2,29 @@ import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfj
 import JSZip from 'jszip';
 
 // ==========================================
-// PDF TO JPG
+// PDF TO JPG / CBZ
 // ==========================================
 export function initPdfToJpg(container) {
   const ui = createConvertUI(container, {
     title: 'Drag & Drop PDF document here',
-    subtitle: 'Render each PDF page to individual JPG images',
+    subtitle: 'Render each PDF page to individual JPG images or a CBZ archive',
     inputType: 'pdf',
     icon: 'bi-file-pdf',
     fileIcon: 'bi-filetype-jpg',
-    multiple: false
+    multiple: false,
+    settingsHTML: `
+      <div class="form-group">
+        <label for="pdf-jpg-format">Output Format</label>
+        <select id="pdf-jpg-format" class="form-control">
+          <option value="zip">ZIP Archive (JPG Images)</option>
+          <option value="cbz">Comic Book Archive (.cbz)</option>
+        </select>
+        <span class="form-help" style="margin-top: 0.4rem; display: block;">
+          <strong>ZIP Archive</strong>: A standard folder of JPG files.<br>
+          <strong>Comic Book Archive</strong>: A .cbz bundle for sequential reading in comic viewer apps.
+        </span>
+      </div>
+    `
   });
 
   let fileBuffer = null;
@@ -34,6 +47,8 @@ export function initPdfToJpg(container) {
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
+    
+    const outputFormat = container.querySelector('#pdf-jpg-format').value;
     const progress = showProgressView(container, 'Loading render tools...');
     
     try {
@@ -58,24 +73,26 @@ export function initPdfToJpg(container) {
         });
       }
 
-      progress.progressText.innerText = 'Packaging images into ZIP...';
+      const isCbz = outputFormat === 'cbz';
+      const outputName = file.name.replace(/\.pdf$/i, '') + (isCbz ? '.cbz' : '_images.zip');
+      const mimeType = isCbz ? 'application/x-cbz' : 'application/zip';
+
+      progress.progressText.innerText = `Packaging images into ${isCbz ? 'CBZ' : 'ZIP'}...`;
       progress.progressBar.style.width = '95%';
-      
-      const zipName = file.name.replace(/\.pdf$/i, '') + '_images.zip';
       
       const zip = new JSZip();
       filesToZip.forEach(f => {
         zip.file(f.name, f.data, { base64: true });
       });
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(zipBlob, zipName, 'application/zip');
+      downloadBlob(zipBlob, outputName, mimeType);
       
       progress.progressBar.style.width = '100%';
 
       showSuccessView(container, {
-        title: 'PDF pages converted to JPG!',
-        meta: `Images package: <strong>${zipName}</strong>`,
-        icon: 'bi-file-earmark-zip-fill',
+        title: isCbz ? 'PDF converted to Comic Archive!' : 'PDF pages converted to JPG!',
+        meta: `Images package: <strong>${outputName}</strong>`,
+        icon: isCbz ? 'bi-book-half' : 'bi-file-earmark-zip-fill',
         downloadBtn: false,
         onReload: () => initPdfToJpg(container)
       });
