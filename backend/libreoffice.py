@@ -64,6 +64,22 @@ async def convert(
     # Per-conversion profile so concurrent soffice runs don't share config state.
     profile = Path(tempfile.mkdtemp(prefix="lo_profile_"))
     try:
+        # Pre-configure profile to disable loading document printer settings
+        user_dir = profile / "user"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        xcu_path = user_dir / "registrymodifications.xcu"
+        xcu_content = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<oor:items xmlns:oor="http://openoffice.org/2001/registry" '
+            'xmlns:xs="http://www.w3.org/2001/XMLSchema" '
+            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
+            '  <item oor:path="/org.openoffice.Office.Common/Save/Document">'
+            '<prop oor:name="LoadPrinterSetup" oor:type="xs:boolean"><value>false</value></prop>'
+            '</item>\n'
+            '</oor:items>\n'
+        )
+        xcu_path.write_text(xcu_content, encoding="utf-8")
+
         cmd = [
             soffice,
             "--headless",
