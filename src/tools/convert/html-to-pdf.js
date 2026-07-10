@@ -1,19 +1,19 @@
-import { showSuccessView, showProgressView, showErrorView, downloadBlob } from './convert-shared.js';
+import { showSuccessView, showProgressView, showErrorView, downloadBlob, refreshBackendStatus } from './convert-shared.js';
 import { loadScript } from '../../utils.js';
 import html2pdf from 'html2pdf.js';
 
 // ==========================================
-// CUSTOM HTML SANITIZER (SSRF & XSS Prevention)
+// CUSTOM HTML SANITIZER & CORS RESOLVER
 // ==========================================
-function sanitizeHtml(html) {
+function preprocessHtml(html, originalUrl, backendOnline) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
 
-  // Remove dangerous executable / embed elements
+  // 1. Remove dangerous executable / embed elements
   const tagsToRemove = doc.querySelectorAll('script, iframe, object, embed, applet, form, meta, link');
   tagsToRemove.forEach(tag => tag.remove());
 
-  // Scan all nodes for inline scripts or dangerous protocols
+  // 2. Scan all nodes for inline scripts or dangerous protocols
   const allElements = doc.querySelectorAll('*');
   const dangerousSchemes = /^\s*(file|gopher|ftp|javascript):/i;
 
@@ -29,6 +29,39 @@ function sanitizeHtml(html) {
       }
     }
   });
+
+  // 3. Resolve relative URLs using base website URL if originalUrl is provided
+  if (originalUrl) {
+    try {
+      const baseUrl = new URL(originalUrl);
+      const allUrls = doc.querySelectorAll('[src], [href]');
+      allUrls.forEach(el => {
+        const attr = el.hasAttribute('src') ? 'src' : 'href';
+        const val = el.getAttribute(attr);
+        if (val && !val.startsWith('data:') && !val.startsWith('javascript:') && !val.startsWith('#')) {
+          try {
+            const absoluteUrl = new URL(val, baseUrl).href;
+            el.setAttribute(attr, absoluteUrl);
+          } catch (e) {
+            // ignore invalid URL
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Failed to parse base URL for relative link resolution:', e);
+    }
+  }
+
+  // 4. Proxy external images through local backend to prevent tainted canvas
+  if (backendOnline) {
+    const allImages = doc.querySelectorAll('img');
+    allImages.forEach(img => {
+      const src = img.getAttribute('src');
+      if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
+        img.setAttribute('src', `http://127.0.0.1:5000/proxy/image?url=${encodeURIComponent(src)}`);
+      }
+    });
+  }
 
   return doc.body.innerHTML;
 }
@@ -58,7 +91,7 @@ export function initHtmlToPdf(container) {
       <div id="html-url-wrapper" class="form-group" style="margin-top: 1rem; display: none;">
         <label for="html-url-input">Website URL</label>
         <input type="url" id="html-url-input" class="form-control" placeholder="https://example.com">
-        <span class="form-help">Enter a URL. We will fetch and load the page using a client CORS proxy.</span>
+        <span class="form-help">Enter a URL. We will fetch and load the page using a CORS proxy.</span>
       </div>
     </div>
 
@@ -124,13 +157,16 @@ export function initHtmlToPdf(container) {
     const orientation = container.querySelector('#html-layout-orient').value;
     const margin = parseFloat(container.querySelector('#html-layout-margin').value);
 
+    // Check backend connection status for image proxying
+    const backend = await refreshBackendStatus(container);
+
     let htmlContent = '';
     let nameSuffix = 'webpage';
 
     if (mode === 'code') {
       const rawHtml = codeArea.value.trim();
       if (!rawHtml) return alert('Please input some HTML content.');
-      htmlContent = sanitizeHtml(rawHtml);
+      htmlContent = preprocessHtml(rawHtml, null, backend.ok);
       nameSuffix = 'markup';
     } else if (mode === 'markdown') {
       const markdown = codeArea.value.trim();
@@ -140,7 +176,7 @@ export function initHtmlToPdf(container) {
       try {
         await loadScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js');
         const compiledHtml = typeof window.marked.parse === 'function' ? window.marked.parse(markdown) : window.marked(markdown);
-        htmlContent = sanitizeHtml(compiledHtml);
+        htmlContent = preprocessHtml(compiledHtml, null, backend.ok);
         nameSuffix = 'markdown';
       } catch (err) {
         console.error(err);
@@ -154,12 +190,19 @@ export function initHtmlToPdf(container) {
       
       const progress = showProgressView(container, `Fetching webpage via proxy...`);
       try {
-        // Fetch URL via public proxy to bypass CORS
-        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-        if (!response.ok) throw new Error('Webpage could not be fetched. Check the URL.');
-        
-        const data = await response.json();
-        htmlContent = sanitizeHtml(data.contents);
+        let fetchedHtml = '';
+        if (backend.ok) {
+          const response = await fetch(`http://127.0.0.1:5000/proxy/webpage?url=${encodeURIComponent(url)}`);
+          if (!response.ok) throw new Error(`Webpage could not be fetched by local backend: HTTP ${response.status}`);
+          fetchedHtml = await response.text();
+        } else {
+          // Fallback to public CORS proxy if backend is offline
+          const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+          if (!response.ok) throw new Error('Webpage could not be fetched by public proxy.');
+          const data = await response.json();
+          fetchedHtml = data.contents;
+        }
+        htmlContent = preprocessHtml(fetchedHtml, url, backend.ok);
       } catch (err) {
         console.error(err);
         return showErrorView(container, `Failed to load URL contents: ${err.message}`, () => initHtmlToPdf(container));

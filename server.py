@@ -16,10 +16,10 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-
 import shutil
+import httpx
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
@@ -196,6 +196,40 @@ async def convert_powerpoint_to_pdf(file: UploadFile = File(...)):
     return await _run_conversion(
         file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
     )
+
+
+
+
+@app.get("/proxy/webpage")
+async def proxy_webpage(url: str):
+    """Proxy external webpages to bypass CORS for client-side loading."""
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+            }
+            resp = await client.get(url, headers=headers, follow_redirects=True, timeout=15.0)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch webpage: HTTP {resp.status_code}")
+            return Response(content=resp.text, media_type="text/html")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Webpage proxy failed: {e}")
+
+
+@app.get("/proxy/image")
+async def proxy_image(url: str):
+    """Proxy external images to bypass CORS and prevent tainted canvas in html2pdf."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, follow_redirects=True, timeout=10.0)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch image: HTTP {resp.status_code}")
+            return Response(content=resp.content, media_type=resp.headers.get("content-type", "image/jpeg"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image proxy failed: {e}")
 
 
 if __name__ == "__main__":
