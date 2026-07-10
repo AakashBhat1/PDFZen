@@ -76,7 +76,8 @@ async def _run_conversion(file: UploadFile, converter, output_media_type: str, d
 
     try:
         stem = _safe_stem(file.filename)
-        input_path = Path(temp_dir) / f"{stem}.pdf"
+        suffix = Path(file.filename or "document.pdf").suffix or ".pdf"
+        input_path = Path(temp_dir) / f"{stem}{suffix}"
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
