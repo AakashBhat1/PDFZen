@@ -18,15 +18,15 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 *   **Watermark** `[Active]`: Overlay transparent text stamps or logo images onto page layers.
 
 ### 2. Document Conversions
-*   **PDF to Word** `[Active]`: Extract text content and structure it into Microsoft Word (.docx) paragraphs.
+*   **PDF to Word** `[Active]`: Convert PDF layouts, tables, and images to Microsoft Word (.docx) via high-fidelity local python backend (pdf2docx), or client-side fallback.
+*   **PDF to Excel** `[Active]`: Reconstruct spreadsheet tables and text into Excel Workbooks (.xlsx) or CSV sheets via local backend (pdfplumber + pandas), or client-side fallback.
+*   **PDF to PowerPoint** `[Active]`: Convert pages to editable slide presentations (.pptx) via local backend (LibreOffice), or client-side fallback.
+*   **PDF to JPG** `[Active]`: Render pages into high-resolution JPG images packaged in a ZIP or Comic Book Archive (.cbz) via local backend (PyMuPDF with custom DPI), or client-side fallback.
+*   **PDF to Markdown** `[Active]`: Convert document structure to clean Markdown text (.md) via local backend (pymupdf4llm), or client-side fallback.
 *   **Word to PDF** `[In Progress]`: Convert DOCX to PDF by converting it to HTML via Mammoth.js and printing it via html2pdf.js.
-*   **PDF to Excel** `[In Progress]`: Parse table grids from PDF texts and compile them into Excel sheets (.xlsx).
 *   **Excel to PDF** `[In Progress]`: Convert spreadsheets to styled HTML tables and export them to PDF pages.
-*   **PDF to PowerPoint** `[In Progress]`: Generate Slide decks from extracted text headers using PptxGenJS.
 *   **PowerPoint to PDF** `[In Progress]`: Parse slide ZIP XML structures to layout HTML pages and print to PDF.
-*   **PDF to JPG** `[In Progress]`: Export each PDF page as an individual JPEG and package them into a ZIP file.
 *   **JPG to PDF** `[In Progress]`: Compile images into a PDF with margin and layout sizing settings.
-*   **PDF to Markdown** `[In Progress]`: Parse text formats into structural Markdown files (.md).
 *   **HTML to PDF** `[In Progress]`: Convert raw HTML markup or webpage links to PDF sheets.
 
 ### 3. Edits & Security `[In Progress]`
@@ -45,6 +45,21 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 *   **Compare PDF**: Side-by-side textual modifications diffing tool.
 *   **Scan to PDF**: Capture frames from webcams or mobile cameras and apply document high-contrast thresholding filters.
 *   **PDF Forms**: Fill interactive fields or create new textboxes and checkboxes.
+
+---
+
+## Hybrid Architecture & High-Fidelity Local Backend
+
+PDFZen runs as a hybrid desktop utility:
+1. **Client-Side Engine**: By default, conversions run fully in-browser using client-side JavaScript engines (Mammoth.js, pptxgenjs, pdf.js, xlsx, etc.). This ensures zero server overhead and complete privacy.
+2. **Optional Local Python Backend**: To close the layout and image fidelity gap compared to cloud tools like *iLovePDF* or *Stirling-PDF*, PDFZen integrates with an optional local FastAPI backend. When running, the frontend automatically detects it via `/health` and routes conversion requests through high-performance Python libraries:
+   - **PDF -> Word**: Uses `pdf2docx` to preserve complex layouts, columns, tables, and embed images.
+   - **PDF -> Excel**: Uses `pdfplumber` + `pandas` to reconstruct spreadsheet tables.
+   - **PDF -> PowerPoint**: Uses LibreOffice `soffice` to generate editable PPTX slides from page vectors.
+   - **PDF -> JPG**: Uses PyMuPDF's fast and sharp raster rendering (with customizable DPI settings).
+   - **PDF -> Markdown**: Uses `pymupdf4llm` for clean, structure-aware output.
+
+If the backend is not running, the application silently falls back to the client-side browser engines.
 
 ---
 

@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, extractPDFText, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, extractPDFText, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import PptxGenJS from 'pptxgenjs';
 
 // ==========================================
@@ -11,11 +11,14 @@ export function initPdfToPowerpoint(container) {
     inputType: 'pdf',
     icon: 'bi-file-pdf',
     fileIcon: 'bi-filetype-pptx',
-    multiple: false
+    multiple: false,
+    settingsHTML: backendStatusFieldHTML('Start the local Python server with LibreOffice installed for high-fidelity conversion.')
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -30,10 +33,37 @@ export function initPdfToPowerpoint(container) {
     ui.fileMeta.innerText = 'PDF readied. Click Convert below.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok) {
+      if (backend.libreoffice) {
+        const outputName = file.name.replace(/\.pdf$/i, '') + '.pptx';
+        await convertViaBackend(container, file, {
+          endpoint: '/convert/pdf-to-powerpoint',
+          outName: outputName,
+          mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          title: 'PDF Converted to Slides!',
+          meta: `PowerPoint slide deck: <strong>${outputName}</strong> — Extracted via local Python engine (LibreOffice)`,
+          icon: 'bi-file-earmark-ppt-fill',
+          progressText: 'Converting slides (running LibreOffice)...',
+          onReload: () => initPdfToPowerpoint(container)
+        });
+        return;
+      } else {
+        const statusEl = container.querySelector('#backend-status');
+        if (statusEl) {
+          statusEl.innerHTML = `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ffc107; margin-right: 0.5rem;"></span>Connected (LibreOffice Missing)`;
+          statusEl.style.color = '#ffc107';
+        }
+      }
+    }
+
     const progress = showProgressView(container, 'Parsing slides text...');
     
     try {

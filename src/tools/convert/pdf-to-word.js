@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import { Document, Paragraph, TextRun, ImageRun, Packer, AlignmentType, HeadingLevel, Table, TableRow, TableCell, WidthType } from 'docx';
 import Tesseract from 'tesseract.js';
 
@@ -171,7 +171,7 @@ async function getPageEmbeddedImages(page) {
 /**
  * Extract rich text content and images from a PDF.
  */
-async function extractRichPDFContent(arrayBuffer, isScanned, ocrLang, progressCallback) {
+async function extractRichPDFContent(arrayBuffer, isScanned, ocrLang, renderBackground, progressCallback) {
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
   const numPages = pdf.numPages;
   const pages = [];
@@ -189,20 +189,22 @@ async function extractRichPDFContent(arrayBuffer, isScanned, ocrLang, progressCa
       const scale = 2.0; // High resolution for OCR accuracy
       const canvas = await renderPDFPageToCanvas(page, scale);
 
-      // Save full page image for sandwich background
-      try {
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        if (blob) {
-          const imgBuffer = await blob.arrayBuffer();
-          pageImage = {
-            data: new Uint8Array(imgBuffer),
-            width: viewport.width,
-            height: viewport.height,
-            type: 'png'
-          };
+      // Save full page image for sandwich background (when enabled)
+      if (renderBackground) {
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          if (blob) {
+            const imgBuffer = await blob.arrayBuffer();
+            pageImage = {
+              data: new Uint8Array(imgBuffer),
+              width: viewport.width,
+              height: viewport.height,
+              type: 'png'
+            };
+          }
+        } catch (e) {
+          console.warn(`Could not render background image for page ${pageNum}:`, e);
         }
-      } catch (e) {
-        console.warn(`Could not render background image for page ${pageNum}:`, e);
       }
 
       // Execute OCR via Tesseract
@@ -276,11 +278,33 @@ async function extractRichPDFContent(arrayBuffer, isScanned, ocrLang, progressCa
         });
       }
 
-      // Extract embedded individual raster images
-      // Render page canvas to ensure image objects are populated in page.objs
-      const renderScale = 2.0;
-      await renderPDFPageToCanvas(page, renderScale);
-      embeddedImages = await getPageEmbeddedImages(page);
+      if (renderBackground) {
+        // High-fidelity: rasterize the whole page as a behind-text layer. This
+        // captures vectors, colors, and shading that per-image extraction misses,
+        // so we skip individual image extraction to avoid duplicating content.
+        const bgScale = 2.5;
+        const canvas = await renderPDFPageToCanvas(page, bgScale);
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          if (blob) {
+            const imgBuffer = await blob.arrayBuffer();
+            pageImage = {
+              data: new Uint8Array(imgBuffer),
+              width: viewport.width,
+              height: viewport.height,
+              type: 'png'
+            };
+          }
+        } catch (e) {
+          console.warn(`Could not render high-fidelity background for page ${pageNum}:`, e);
+        }
+      } else {
+        // Extract embedded individual raster images.
+        // Render page canvas to ensure image objects are populated in page.objs.
+        const renderScale = 2.0;
+        await renderPDFPageToCanvas(page, renderScale);
+        embeddedImages = await getPageEmbeddedImages(page);
+      }
     }
 
     // Group lines and partition them into paragraphs & tables
@@ -623,16 +647,11 @@ export function initPdfToWord(container) {
         <input type="checkbox" id="pdf-word-ocr-bg" checked style="width: auto; margin-bottom: 0;">
         <label for="pdf-word-ocr-bg" style="margin-bottom: 0; cursor: pointer;">Preserve scan background (sandwich layout)</label>
       </div>
-      <div class="form-group" style="margin-top: 1rem; border-top: 1px solid #3f3f46; padding-top: 1rem;">
-        <label>Local Server Status</label>
-        <div id="backend-status" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 500; font-size: 0.9rem; margin-top: 0.2rem; color: #ffc107;">
-          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ffc107; transition: background-color 0.3s;"></span>
-          Checking connection...
-        </div>
-        <span class="form-help" style="margin-top: 0.4rem; display: block;">
-          Start the local Python server with <code>uv run server.py</code> for high-fidelity conversion.
-        </span>
+      <div class="form-group" id="hifi-group" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <input type="checkbox" id="pdf-word-hifi" style="width: auto; margin-bottom: 0;">
+        <label for="pdf-word-hifi" style="margin-bottom: 0; cursor: pointer;">High-fidelity: embed page image behind text (larger file, preserves vectors/colors)</label>
       </div>
+      ${backendStatusFieldHTML()}
     `
   });
 
@@ -642,31 +661,16 @@ export function initPdfToWord(container) {
   const modeSelect = container.querySelector('#pdf-word-mode');
   const ocrLangGroup = container.querySelector('#ocr-lang-group');
   const ocrBgGroup = container.querySelector('#ocr-bg-group');
-  const backendStatus = container.querySelector('#backend-status');
+  const hifiGroup = container.querySelector('#hifi-group');
 
   modeSelect.addEventListener('change', () => {
     const isRich = modeSelect.value === 'rich';
     if (ocrLangGroup) ocrLangGroup.style.display = isRich ? 'block' : 'none';
     if (ocrBgGroup) ocrBgGroup.style.display = isRich ? 'flex' : 'none';
+    if (hifiGroup) hifiGroup.style.display = isRich ? 'flex' : 'none';
   });
 
-  // Auto-detect Python conversion backend
-  async function checkBackend() {
-    try {
-      const res = await fetch('http://localhost:5000/health', { signal: AbortSignal.timeout(800) });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        backendStatus.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #28a745; margin-right: 0.5rem;"></span>Connected (High-Quality)';
-        backendStatus.style.color = '#28a745';
-        return true;
-      }
-    } catch (e) {}
-    backendStatus.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #dc3545; margin-right: 0.5rem;"></span>Offline (Using browser engine)';
-    backendStatus.style.color = '#e0a800';
-    return false;
-  }
-
-  checkBackend();
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -690,7 +694,7 @@ export function initPdfToWord(container) {
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
     // Double check backend on file select
-    checkBackend();
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
@@ -699,67 +703,34 @@ export function initPdfToWord(container) {
     const mode = container.querySelector('#pdf-word-mode').value;
     const ocrLang = container.querySelector('#pdf-word-ocr-lang').value;
     const ocrBg = container.querySelector('#pdf-word-ocr-bg').checked;
+    const hiFi = container.querySelector('#pdf-word-hifi').checked;
 
-    const backendActive = await checkBackend();
+    const backend = await refreshBackendStatus(container);
 
-    if (backendActive && mode === 'rich') {
-      await convertViaBackend(container, file);
+    if (backend.ok && mode === 'rich') {
+      const outputName = file.name.replace(/\.pdf$/i, '') + '.docx';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/pdf-to-word',
+        outName: outputName,
+        mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        title: 'PDF Converted to Word (High Quality)!',
+        meta: `Word document: <strong>${outputName}</strong> — Converted via local Python engine (pdf2docx)`,
+        icon: 'bi-file-earmark-word-fill',
+        progressText: 'Converting layout (running pdf2docx)...',
+        onReload: () => initPdfToWord(container)
+      });
     } else if (mode === 'image') {
       await convertImageBased(container, file, fileBuffer);
     } else {
-      await convertRichText(container, file, fileBuffer, ocrLang, ocrBg);
+      await convertRichText(container, file, fileBuffer, ocrLang, ocrBg, hiFi);
     }
   });
 }
 
 /**
- * High-Fidelity conversion via local Python backend
- */
-async function convertViaBackend(container, file) {
-  const progress = showProgressView(container, 'Uploading to local Python backend...');
-  progress.progressBar.style.width = '20%';
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    progress.progressText.innerText = 'Converting layout (running pdf2docx)...';
-    progress.progressBar.style.width = '60%';
-
-    const response = await fetch('http://localhost:5000/convert/pdf-to-word', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({ detail: 'Unknown backend error' }));
-      throw new Error(errData.detail || 'Backend conversion failed');
-    }
-
-    progress.progressText.innerText = 'Downloading converted document...';
-    progress.progressBar.style.width = '90%';
-
-    const docxBlob = await response.blob();
-    progress.progressBar.style.width = '100%';
-
-    const outputName = file.name.replace(/\.pdf$/i, '') + '.docx';
-    showSuccessView(container, {
-      title: 'PDF Converted to Word (High Quality)!',
-      meta: `Word document: <strong>${outputName}</strong> — Converted via local Python engine`,
-      icon: 'bi-file-earmark-word-fill',
-      onDownload: () => downloadBlob(docxBlob, outputName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
-      onReload: () => initPdfToWord(container)
-    });
-  } catch (err) {
-    console.error(err);
-    showErrorView(container, `Backend Error: ${err.message}`, () => initPdfToWord(container));
-  }
-}
-
-/**
  * Rich Text conversion — extracts formatting/images and creates styled docx.
  */
-async function convertRichText(container, file, fileBuffer, ocrLang = 'eng', ocrBg = true) {
+async function convertRichText(container, file, fileBuffer, ocrLang = 'eng', ocrBg = true, hiFi = false) {
   const progress = showProgressView(container, 'Analyzing PDF structure...');
 
   try {
@@ -771,8 +742,11 @@ async function convertRichText(container, file, fileBuffer, ocrLang = 'eng', ocr
       progress.progressText.innerText = 'Digital-Native PDF detected. Extracting formatting...';
     }
 
-    // 2. Extract rich content and images
-    const content = await extractRichPDFContent(fileBuffer, isScanned, ocrLang, (current, total, statusText) => {
+    // 2. Extract rich content and images. For scanned PDFs the page raster is
+    // the OCR "sandwich" background (gated by ocrBg); for digital PDFs the same
+    // technique is opt-in via the high-fidelity checkbox (preserves vectors/colors).
+    const renderBackground = isScanned ? ocrBg : hiFi;
+    const content = await extractRichPDFContent(fileBuffer, isScanned, ocrLang, renderBackground, (current, total, statusText) => {
       progress.progressText.innerText = statusText || `Processing Page ${current} of ${total}...`;
       progress.progressBar.style.width = `${10 + (current / total) * 60}%`;
     });
@@ -787,8 +761,9 @@ async function convertRichText(container, file, fileBuffer, ocrLang = 'eng', ocr
     const docChildren = [];
 
     content.pages.forEach((page, pageIdx) => {
-      // 4a. If scanned and ocrBg is enabled, place page background scan behind text
-      if (isScanned && ocrBg && page.pageImage) {
+      // 4a. If a page raster was captured (scan sandwich, or high-fidelity digital),
+      // place it behind the text layer.
+      if (page.pageImage) {
         docChildren.push(new Paragraph({
           children: [
             new ImageRun({

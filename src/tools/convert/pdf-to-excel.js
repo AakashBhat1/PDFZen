@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -159,41 +159,14 @@ export function initPdfToExcel(container) {
           <strong>CSV</strong>: Returns a text sheet. Multi-page outputs are packaged in a ZIP.
         </span>
       </div>
-      <div class="form-group" style="margin-top: 1rem; border-top: 1px solid #3f3f46; padding-top: 1rem;">
-        <label>Local Server Status</label>
-        <div id="backend-status" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 500; font-size: 0.9rem; margin-top: 0.2rem; color: #ffc107;">
-          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ffc107; transition: background-color 0.3s;"></span>
-          Checking connection...
-        </div>
-        <span class="form-help" style="margin-top: 0.4rem; display: block;">
-          Start the local Python server with <code>uv run server.py</code> for high-fidelity conversion.
-        </span>
-      </div>
+      ${backendStatusFieldHTML()}
     `
   });
 
   let fileBuffer = null;
   let file = null;
 
-  const backendStatus = container.querySelector('#backend-status');
-
-  // Auto-detect Python conversion backend
-  async function checkBackend() {
-    try {
-      const res = await fetch('http://localhost:5000/health', { signal: AbortSignal.timeout(800) });
-      const data = await res.json();
-      if (data.status === 'ok') {
-        backendStatus.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #28a745; margin-right: 0.5rem;"></span>Connected (High-Quality)';
-        backendStatus.style.color = '#28a745';
-        return true;
-      }
-    } catch (e) {}
-    backendStatus.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #dc3545; margin-right: 0.5rem;"></span>Offline (Using browser engine)';
-    backendStatus.style.color = '#e0a800';
-    return false;
-  }
-
-  checkBackend();
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -209,17 +182,30 @@ export function initPdfToExcel(container) {
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
     // Double check backend on file select
-    checkBackend();
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
 
     const outputFormat = container.querySelector('#excel-output-format').value;
-    const backendActive = await checkBackend();
+    const backend = await refreshBackendStatus(container);
 
-    if (backendActive) {
-      await convertViaBackend(container, file, outputFormat);
+    if (backend.ok) {
+      const ext = outputFormat === 'xlsx' ? '.xlsx' : '.csv';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/pdf-to-excel',
+        fields: { format: outputFormat },
+        outName: file.name.replace(/\.pdf$/i, '') + ext,
+        mime: outputFormat === 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv',
+        title: outputFormat === 'xlsx' ? 'PDF Converted to Excel!' : 'PDF Converted to CSV!',
+        meta: `Spreadsheet: <strong>${file.name.replace(/\.pdf$/i, '') + ext}</strong> — Extracted via local Python engine`,
+        icon: outputFormat === 'xlsx' ? 'bi-file-earmark-excel-fill' : 'bi-file-earmark-spreadsheet-fill',
+        progressText: 'Extracting tables (running pdfplumber)...',
+        onReload: () => initPdfToExcel(container)
+      });
     } else {
       await convertClientSide(container, outputFormat);
     }
@@ -309,55 +295,5 @@ export function initPdfToExcel(container) {
       console.error(err);
       showErrorView(container, err.message, () => initPdfToExcel(container));
     }
-  }
-}
-
-/**
- * High-Fidelity Table Extraction via local Python backend
- */
-async function convertViaBackend(container, file, outputFormat) {
-  const progress = showProgressView(container, 'Uploading to local Python backend...');
-  progress.progressBar.style.width = '20%';
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('format', outputFormat);
-
-    progress.progressText.innerText = 'Extracting tables (running pdfplumber)...';
-    progress.progressBar.style.width = '60%';
-
-    const response = await fetch('http://localhost:5000/convert/pdf-to-excel', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({ detail: 'Unknown backend error' }));
-      throw new Error(errData.detail || 'Backend conversion failed');
-    }
-
-    progress.progressText.innerText = 'Downloading spreadsheet...';
-    progress.progressBar.style.width = '90%';
-
-    const excelBlob = await response.blob();
-    progress.progressBar.style.width = '100%';
-
-    const ext = outputFormat === 'xlsx' ? '.xlsx' : '.csv';
-    const outputName = file.name.replace(/\.pdf$/i, '') + ext;
-    const mimeType = outputFormat === 'xlsx'
-      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      : 'text/csv';
-
-    showSuccessView(container, {
-      title: outputFormat === 'xlsx' ? 'PDF Converted to Excel!' : 'PDF Converted to CSV!',
-      meta: `Spreadsheet: <strong>${outputName}</strong> — Extracted via local Python engine`,
-      icon: outputFormat === 'xlsx' ? 'bi-file-earmark-excel-fill' : 'bi-file-earmark-spreadsheet-fill',
-      onDownload: () => downloadBlob(excelBlob, outputName, mimeType),
-      onReload: () => initPdfToExcel(container)
-    });
-  } catch (err) {
-    console.error(err);
-    showErrorView(container, `Backend Error: ${err.message}`, () => initPdfToExcel(container));
   }
 }

@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, extractPDFText, fileToArrayBuffer, downloadBlob } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, extractPDFText, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 
 // ==========================================
 // PDF TO MARKDOWN
@@ -10,11 +10,14 @@ export function initPdfToMarkdown(container) {
     inputType: 'pdf',
     icon: 'bi-file-pdf',
     fileIcon: 'bi-filetype-md',
-    multiple: false
+    multiple: false,
+    settingsHTML: backendStatusFieldHTML()
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -29,10 +32,29 @@ export function initPdfToMarkdown(container) {
     ui.fileMeta.innerText = 'PDF loaded. Ready to compile Markdown.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok) {
+      const outputName = file.name.replace(/\.pdf$/i, '') + '.md';
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/pdf-to-markdown',
+        outName: outputName,
+        mime: 'text/markdown',
+        title: 'PDF converted to Markdown!',
+        meta: `Markdown file: <strong>${outputName}</strong> — Extracted via local Python engine (pymupdf4llm)`,
+        icon: 'bi-file-earmark-code-fill',
+        progressText: 'Extracting document layout (running pymupdf4llm)...',
+        onReload: () => initPdfToMarkdown(container)
+      });
+      return;
+    }
+
     const progress = showProgressView(container, 'Parsing text layouts...');
 
     try {

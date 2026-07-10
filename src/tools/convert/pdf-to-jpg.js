@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from './convert-shared.js';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import JSZip from 'jszip';
 
 // ==========================================
@@ -24,11 +24,21 @@ export function initPdfToJpg(container) {
           <strong>Comic Book Archive</strong>: A .cbz bundle for sequential reading in comic viewer apps.
         </span>
       </div>
+      <div class="form-group" style="margin-top: 1rem;">
+        <label for="pdf-jpg-dpi">Render Resolution (DPI)</label>
+        <input type="number" id="pdf-jpg-dpi" class="form-control" min="72" max="600" value="200">
+        <span class="form-help" style="margin-top: 0.4rem; display: block;">
+          Lower DPI is faster; higher DPI is sharper (72–600). Default is 200.
+        </span>
+      </div>
+      ${backendStatusFieldHTML()}
     `
   });
 
   let fileBuffer = null;
   let file = null;
+
+  refreshBackendStatus(container);
 
   ui.dropzone.addEventListener('click', () => ui.fileInput.click());
   ui.fileInput.addEventListener('change', (e) => {
@@ -43,25 +53,52 @@ export function initPdfToJpg(container) {
     ui.fileMeta.innerText = 'PDF readied. Ready to render pages.';
     ui.runBtn.disabled = false;
     fileBuffer = await fileToArrayBuffer(file);
+    refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
     if (!file || !fileBuffer) return;
-    
+
     const outputFormat = container.querySelector('#pdf-jpg-format').value;
+    let dpi = parseInt(container.querySelector('#pdf-jpg-dpi').value) || 200;
+    dpi = Math.max(72, Math.min(dpi, 600));
+
+    const backend = await refreshBackendStatus(container);
+
+    if (backend.ok) {
+      const isCbz = outputFormat === 'cbz';
+      const ext = isCbz ? '.cbz' : '_images.zip';
+      const mime = isCbz ? 'application/x-cbz' : 'application/zip';
+      const outputName = file.name.replace(/\.pdf$/i, '') + ext;
+
+      await convertViaBackend(container, file, {
+        endpoint: '/convert/pdf-to-jpg',
+        fields: { dpi: dpi.toString() },
+        outName: outputName,
+        mime: mime,
+        title: isCbz ? 'PDF converted to Comic Archive!' : 'PDF pages converted to JPG!',
+        meta: `Images package: <strong>${outputName}</strong> — Rendered via local Python engine (PyMuPDF at ${dpi} DPI)`,
+        icon: isCbz ? 'bi-book-half' : 'bi-file-earmark-zip-fill',
+        progressText: `Rendering images at ${dpi} DPI (running PyMuPDF)...`,
+        onReload: () => initPdfToJpg(container)
+      });
+      return;
+    }
+
     const progress = showProgressView(container, 'Loading render tools...');
-    
+
     try {
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
       const totalPages = pdf.numPages;
       const filesToZip = [];
+      const scale = dpi / 72; // scale for PDF.js based on selected DPI (72 DPI is 1.0 scale)
 
       for (let i = 1; i <= totalPages; i++) {
         progress.progressText.innerText = `Rendering page ${i} of ${totalPages} to image...`;
         progress.progressBar.style.width = `${15 + (i / totalPages) * 75}%`;
-        
+
         const page = await pdf.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, 2.0); // 2.0 scale for high resolution JPG
+        const canvas = await renderPDFPageToCanvas(page, scale);
         
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         const base64Data = dataUrl.split(',')[1];
