@@ -1,5 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, extractPDFText, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
-import PptxGenJS from 'pptxgenjs';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 
 // ==========================================
 // PDF TO POWERPOINT
@@ -62,79 +61,5 @@ export function initPdfToPowerpoint(container) {
       progressText: 'Converting slides (running LibreOffice)...',
       onReload: () => initPdfToPowerpoint(container)
     });
-  });
-
-    const progress = showProgressView(container, 'Parsing slides text...');
-    
-    try {
-      const pagesText = await extractPDFText(fileBuffer, (current, total) => {
-        progress.progressText.innerText = `Extracting PDF layouts... Page ${current} of ${total}`;
-        progress.progressBar.style.width = `${10 + (current / total) * 50}%`;
-      });
-
-      progress.progressText.innerText = 'Creating presentation...';
-      progress.progressBar.style.width = '85%';
-      
-      const pres = new PptxGenJS();
-      
-      pagesText.forEach((lines, pageIdx) => {
-        const slide = pres.addSlide();
-        
-        // Define Slide Title
-        let titleText = `Slide ${pageIdx + 1}`;
-        let bodyLines = [];
-        
-        if (lines.length > 0) {
-          titleText = lines[0]; // Heuristic: first line is slide header
-          bodyLines = lines.slice(1);
-        }
-
-        // Add Slide Title
-        slide.addText(titleText, {
-          x: 0.5,
-          y: 0.5,
-          w: 9.0,
-          h: 0.8,
-          fontSize: 24,
-          bold: true,
-          color: '363636',
-          fontFace: 'Arial'
-        });
-
-        // Add Slide Content
-        if (bodyLines.length > 0) {
-          slide.addText(bodyLines.join('\n'), {
-            x: 0.5,
-            y: 1.5,
-            w: 9.0,
-            h: 5.0,
-            fontSize: 14,
-            color: '666666',
-            fontFace: 'Arial',
-            valign: 'top'
-          });
-        }
-      });
-
-      // Write PPTX presentation
-      progress.progressText.innerText = 'Saving slide deck...';
-      progress.progressBar.style.width = '95%';
-      
-      const outputName = file.name.replace(/\.pdf$/i, '') + '.pptx';
-      await pres.writeFile({ fileName: outputName });
-      progress.progressBar.style.width = '100%';
-
-      showSuccessView(container, {
-        title: 'PDF Converted to Slides!',
-        meta: `PowerPoint slide deck: <strong>${outputName}</strong>`,
-        icon: 'bi-file-earmark-ppt-fill',
-        downloadBtn: false, // Automatically saved/downloaded by pptxgen.js
-        onReload: () => initPdfToPowerpoint(container)
-      });
-
-    } catch (err) {
-      console.error(err);
-      showErrorView(container, err.message, () => initPdfToPowerpoint(container));
-    }
   });
 }
