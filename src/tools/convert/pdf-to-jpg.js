@@ -1,5 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
-import JSZip from 'jszip';
+import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 
 // ==========================================
 // PDF TO JPG / CBZ
@@ -86,60 +85,5 @@ export function initPdfToJpg(container) {
       progressText: `Rendering images at ${dpi} DPI (running PyMuPDF)...`,
       onReload: () => initPdfToJpg(container)
     });
-  });
-
-    const progress = showProgressView(container, 'Loading render tools...');
-
-    try {
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
-      const totalPages = pdf.numPages;
-      const filesToZip = [];
-      const scale = dpi / 72; // scale for PDF.js based on selected DPI (72 DPI is 1.0 scale)
-
-      for (let i = 1; i <= totalPages; i++) {
-        progress.progressText.innerText = `Rendering page ${i} of ${totalPages} to image...`;
-        progress.progressBar.style.width = `${15 + (i / totalPages) * 75}%`;
-
-        const page = await pdf.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, scale);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        const base64Data = dataUrl.split(',')[1];
-        
-        const pageNum = String(i).padStart(3, '0');
-        filesToZip.push({
-          name: `${file.name.replace(/\.pdf$/i, '')}_page_${pageNum}.jpg`,
-          data: base64Data
-        });
-      }
-
-      const isCbz = outputFormat === 'cbz';
-      const outputName = file.name.replace(/\.pdf$/i, '') + (isCbz ? '.cbz' : '_images.zip');
-      const mimeType = isCbz ? 'application/x-cbz' : 'application/zip';
-
-      progress.progressText.innerText = `Packaging images into ${isCbz ? 'CBZ' : 'ZIP'}...`;
-      progress.progressBar.style.width = '95%';
-      
-      const zip = new JSZip();
-      filesToZip.forEach(f => {
-        zip.file(f.name, f.data, { base64: true });
-      });
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(zipBlob, outputName, mimeType);
-      
-      progress.progressBar.style.width = '100%';
-
-      showSuccessView(container, {
-        title: isCbz ? 'PDF converted to Comic Archive!' : 'PDF pages converted to JPG!',
-        meta: `Images package: <strong>${outputName}</strong>`,
-        icon: isCbz ? 'bi-book-half' : 'bi-file-earmark-zip-fill',
-        downloadBtn: false,
-        onReload: () => initPdfToJpg(container)
-      });
-
-    } catch (err) {
-      console.error(err);
-      showErrorView(container, err.message, () => initPdfToJpg(container));
-    }
   });
 }
