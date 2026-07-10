@@ -65,25 +65,28 @@ export function initPdfToJpg(container) {
 
     const backend = await refreshBackendStatus(container);
 
-    if (backend.ok) {
-      const isCbz = outputFormat === 'cbz';
-      const ext = isCbz ? '.cbz' : '_images.zip';
-      const mime = isCbz ? 'application/x-cbz' : 'application/zip';
-      const outputName = file.name.replace(/\.pdf$/i, '') + ext;
-
-      await convertViaBackend(container, file, {
-        endpoint: '/convert/pdf-to-jpg',
-        fields: { dpi: dpi.toString() },
-        outName: outputName,
-        mime: mime,
-        title: isCbz ? 'PDF converted to Comic Archive!' : 'PDF pages converted to JPG!',
-        meta: `Images package: <strong>${outputName}</strong> — Rendered via local Python engine (PyMuPDF at ${dpi} DPI)`,
-        icon: isCbz ? 'bi-book-half' : 'bi-file-earmark-zip-fill',
-        progressText: `Rendering images at ${dpi} DPI (running PyMuPDF)...`,
-        onReload: () => initPdfToJpg(container)
-      });
+    if (!backend.ok) {
+      showErrorView(container, "Local Python backend is offline. Please start it using 'start.bat' (or 'uv run server.py') to enable high-fidelity PDF to JPG conversion.", () => initPdfToJpg(container));
       return;
     }
+
+    const isCbz = outputFormat === 'cbz';
+    const ext = isCbz ? '.cbz' : '_images.zip';
+    const mime = isCbz ? 'application/x-cbz' : 'application/zip';
+    const outputName = file.name.replace(/\.pdf$/i, '') + ext;
+
+    await convertViaBackend(container, file, {
+      endpoint: '/convert/pdf-to-jpg',
+      fields: { dpi: dpi.toString() },
+      outName: outputName,
+      mime: mime,
+      title: isCbz ? 'PDF converted to Comic Archive!' : 'PDF pages converted to JPG!',
+      meta: `Images package: <strong>${outputName}</strong> — Rendered via local Python engine (PyMuPDF at ${dpi} DPI)`,
+      icon: isCbz ? 'bi-book-half' : 'bi-file-earmark-zip-fill',
+      progressText: `Rendering images at ${dpi} DPI (running PyMuPDF)...`,
+      onReload: () => initPdfToJpg(container)
+    });
+  });
 
     const progress = showProgressView(container, 'Loading render tools...');
 

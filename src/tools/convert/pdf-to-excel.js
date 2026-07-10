@@ -191,24 +191,25 @@ export function initPdfToExcel(container) {
     const outputFormat = container.querySelector('#excel-output-format').value;
     const backend = await refreshBackendStatus(container);
 
-    if (backend.ok) {
-      const ext = outputFormat === 'xlsx' ? '.xlsx' : '.csv';
-      await convertViaBackend(container, file, {
-        endpoint: '/convert/pdf-to-excel',
-        fields: { format: outputFormat },
-        outName: file.name.replace(/\.pdf$/i, '') + ext,
-        mime: outputFormat === 'xlsx'
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : 'text/csv',
-        title: outputFormat === 'xlsx' ? 'PDF Converted to Excel!' : 'PDF Converted to CSV!',
-        meta: `Spreadsheet: <strong>${file.name.replace(/\.pdf$/i, '') + ext}</strong> — Extracted via local Python engine`,
-        icon: outputFormat === 'xlsx' ? 'bi-file-earmark-excel-fill' : 'bi-file-earmark-spreadsheet-fill',
-        progressText: 'Extracting tables (running pdfplumber)...',
-        onReload: () => initPdfToExcel(container)
-      });
-    } else {
-      await convertClientSide(container, outputFormat);
+    if (!backend.ok) {
+      showErrorView(container, "Local Python backend is offline. Please start it using 'start.bat' (or 'uv run server.py') to enable high-fidelity PDF to Excel conversion.", () => initPdfToExcel(container));
+      return;
     }
+
+    const ext = outputFormat === 'xlsx' ? '.xlsx' : '.csv';
+    await convertViaBackend(container, file, {
+      endpoint: '/convert/pdf-to-excel',
+      fields: { format: outputFormat },
+      outName: file.name.replace(/\.pdf$/i, '') + ext,
+      mime: outputFormat === 'xlsx'
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'text/csv',
+      title: outputFormat === 'xlsx' ? 'PDF Converted to Excel!' : 'PDF Converted to CSV!',
+      meta: `Spreadsheet: <strong>${file.name.replace(/\.pdf$/i, '') + ext}</strong> — Extracted via local Python engine`,
+      icon: outputFormat === 'xlsx' ? 'bi-file-earmark-excel-fill' : 'bi-file-earmark-spreadsheet-fill',
+      progressText: 'Extracting tables (running pdfplumber)...',
+      onReload: () => initPdfToExcel(container)
+    });
   });
 
   async function convertClientSide(container, outputFormat) {

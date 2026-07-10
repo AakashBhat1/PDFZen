@@ -707,7 +707,12 @@ export function initPdfToWord(container) {
 
     const backend = await refreshBackendStatus(container);
 
-    if (backend.ok && mode === 'rich') {
+    if (!backend.ok) {
+      showErrorView(container, "Local Python backend is offline. Please start it using 'start.bat' (or 'uv run server.py') to enable high-fidelity PDF to Word conversion.", () => initPdfToWord(container));
+      return;
+    }
+
+    if (mode === 'rich') {
       const outputName = file.name.replace(/\.pdf$/i, '') + '.docx';
       await convertViaBackend(container, file, {
         endpoint: '/convert/pdf-to-word',
@@ -721,8 +726,6 @@ export function initPdfToWord(container) {
       });
     } else if (mode === 'image') {
       await convertImageBased(container, file, fileBuffer);
-    } else {
-      await convertRichText(container, file, fileBuffer, ocrLang, ocrBg, hiFi);
     }
   });
 }

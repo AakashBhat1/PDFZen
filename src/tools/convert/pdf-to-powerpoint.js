@@ -41,28 +41,28 @@ export function initPdfToPowerpoint(container) {
 
     const backend = await refreshBackendStatus(container);
 
-    if (backend.ok) {
-      if (backend.libreoffice) {
-        const outputName = file.name.replace(/\.pdf$/i, '') + '.pptx';
-        await convertViaBackend(container, file, {
-          endpoint: '/convert/pdf-to-powerpoint',
-          outName: outputName,
-          mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          title: 'PDF Converted to Slides!',
-          meta: `PowerPoint slide deck: <strong>${outputName}</strong> — Extracted via local Python engine (LibreOffice)`,
-          icon: 'bi-file-earmark-ppt-fill',
-          progressText: 'Converting slides (running LibreOffice)...',
-          onReload: () => initPdfToPowerpoint(container)
-        });
-        return;
-      } else {
-        const statusEl = container.querySelector('#backend-status');
-        if (statusEl) {
-          statusEl.innerHTML = `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ffc107; margin-right: 0.5rem;"></span>Connected (LibreOffice Missing)`;
-          statusEl.style.color = '#ffc107';
-        }
-      }
+    if (!backend.ok) {
+      showErrorView(container, "Local Python backend is offline. Please start it using 'start.bat' (or 'uv run server.py') to enable high-fidelity PDF to PowerPoint conversion.", () => initPdfToPowerpoint(container));
+      return;
     }
+
+    if (!backend.libreoffice) {
+      showErrorView(container, "LibreOffice is missing on the local backend. Please run 'setup.bat' or install LibreOffice on your machine to enable PowerPoint conversion.", () => initPdfToPowerpoint(container));
+      return;
+    }
+
+    const outputName = file.name.replace(/\.pdf$/i, '') + '.pptx';
+    await convertViaBackend(container, file, {
+      endpoint: '/convert/pdf-to-powerpoint',
+      outName: outputName,
+      mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      title: 'PDF Converted to Slides!',
+      meta: `PowerPoint slide deck: <strong>${outputName}</strong> — Extracted via local Python engine (LibreOffice)`,
+      icon: 'bi-file-earmark-ppt-fill',
+      progressText: 'Converting slides (running LibreOffice)...',
+      onReload: () => initPdfToPowerpoint(container)
+    });
+  });
 
     const progress = showProgressView(container, 'Parsing slides text...');
     

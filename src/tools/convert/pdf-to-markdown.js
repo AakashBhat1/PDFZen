@@ -40,20 +40,23 @@ export function initPdfToMarkdown(container) {
 
     const backend = await refreshBackendStatus(container);
 
-    if (backend.ok) {
-      const outputName = file.name.replace(/\.pdf$/i, '') + '.md';
-      await convertViaBackend(container, file, {
-        endpoint: '/convert/pdf-to-markdown',
-        outName: outputName,
-        mime: 'text/markdown',
-        title: 'PDF converted to Markdown!',
-        meta: `Markdown file: <strong>${outputName}</strong> — Extracted via local Python engine (pymupdf4llm)`,
-        icon: 'bi-file-earmark-code-fill',
-        progressText: 'Extracting document layout (running pymupdf4llm)...',
-        onReload: () => initPdfToMarkdown(container)
-      });
+    if (!backend.ok) {
+      showErrorView(container, "Local Python backend is offline. Please start it using 'start.bat' (or 'uv run server.py') to enable high-fidelity PDF to Markdown conversion.", () => initPdfToMarkdown(container));
       return;
     }
+
+    const outputName = file.name.replace(/\.pdf$/i, '') + '.md';
+    await convertViaBackend(container, file, {
+      endpoint: '/convert/pdf-to-markdown',
+      outName: outputName,
+      mime: 'text/markdown',
+      title: 'PDF converted to Markdown!',
+      meta: `Markdown file: <strong>${outputName}</strong> — Extracted via local Python engine (pymupdf4llm)`,
+      icon: 'bi-file-earmark-code-fill',
+      progressText: 'Extracting document layout (running pymupdf4llm)...',
+      onReload: () => initPdfToMarkdown(container)
+    });
+  });
 
     const progress = showProgressView(container, 'Parsing text layouts...');
 
