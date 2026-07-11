@@ -421,6 +421,11 @@ body.light-theme .btn-icon:hover {
   overflow: hidden;
 }
 
+/* Soft-hide tools that are not ready for users (code + routing stay intact) */
+.tool-card.tool-card--hidden {
+  display: none !important;
+}
+
 .tool-card:hover {
   background: var(--bg-hover);
   border-color: var(--border-hover);
