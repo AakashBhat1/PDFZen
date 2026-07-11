@@ -409,6 +409,9 @@ body.light-theme .btn-icon:hover {
   border-radius: 16px;
   padding: 1.5rem;
   cursor: pointer;
+  /* Skip offscreen card work; appearance unchanged when visible */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
   backdrop-filter: blur(12px);
   transition: var(--transition-smooth);
   display: flex;

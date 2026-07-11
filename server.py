@@ -16,6 +16,7 @@ import logging
 import os
 import shutil
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -32,20 +33,11 @@ from backend.runtime_paths import libreoffice_available
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("pdfzen")
 
-app = FastAPI(title="PDFZen Local Conversion Backend")
-
 # The Vite dev server runs on :3000; restrict CORS to it rather than "*".
 _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 _DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -53,6 +45,34 @@ _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.prese
 _PROXY_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
+# Cap proxy downloads so a malicious URL cannot exhaust local memory.
+_MAX_PROXY_BYTES = 25 * 1024 * 1024
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Reuse one httpx client for all proxy routes (connection pooling)."""
+    app.state.http = httpx.AsyncClient(
+        headers={"User-Agent": _PROXY_UA},
+        follow_redirects=True,
+        timeout=httpx.Timeout(15.0, connect=5.0),
+        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+    )
+    try:
+        yield
+    finally:
+        await app.state.http.aclose()
+
+
+app = FastAPI(title="PDFZen Local Conversion Backend", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -214,19 +234,13 @@ async def convert_powerpoint_to_pdf(file: UploadFile = File(...)):
 async def proxy_webpage(url: str):
     """Proxy external webpages to bypass CORS for client-side loading."""
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                url,
-                headers={"User-Agent": _PROXY_UA},
-                follow_redirects=True,
-                timeout=15.0,
+        resp = await app.state.http.get(url, timeout=15.0)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Failed to fetch webpage: HTTP {resp.status_code}",
             )
-            if resp.status_code != 200:
-                raise HTTPException(
-                    status_code=resp.status_code,
-                    detail=f"Failed to fetch webpage: HTTP {resp.status_code}",
-                )
-            return Response(content=resp.text, media_type="text/html")
+        return Response(content=resp.text, media_type="text/html")
     except HTTPException:
         raise
     except Exception as e:
@@ -237,17 +251,18 @@ async def proxy_webpage(url: str):
 async def proxy_image(url: str):
     """Proxy external images to bypass CORS and prevent tainted canvas in html2pdf."""
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, follow_redirects=True, timeout=10.0)
-            if resp.status_code != 200:
-                raise HTTPException(
-                    status_code=resp.status_code,
-                    detail=f"Failed to fetch image: HTTP {resp.status_code}",
-                )
-            return Response(
-                content=resp.content,
-                media_type=resp.headers.get("content-type", "image/jpeg"),
+        resp = await app.state.http.get(url, timeout=10.0)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Failed to fetch image: HTTP {resp.status_code}",
             )
+        if len(resp.content) > _MAX_PROXY_BYTES:
+            raise HTTPException(status_code=413, detail="Proxied image exceeds size limit.")
+        return Response(
+            content=resp.content,
+            media_type=resp.headers.get("content-type", "image/jpeg"),
+        )
     except HTTPException:
         raise
     except Exception as e:

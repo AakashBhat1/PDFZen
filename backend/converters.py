@@ -64,6 +64,8 @@ async def pdf_to_excel(
         with pdfplumber.open(str(input_path)) as pdf:
             for page_idx, page in enumerate(pdf.pages):
                 tables = page.find_tables()
+                # Precompute vertical ranges once per page (same thresholds as before).
+                table_y_ranges = [(t.bbox[1] - 1, t.bbox[3] + 1) for t in tables]
                 words = page.extract_words()
 
                 # Group words into lines based on vertical proximity
@@ -83,13 +85,9 @@ async def pdf_to_excel(
                 filtered_lines = []
                 for line in lines:
                     avg_top = sum(w["top"] for w in line) / len(line)
-                    in_table = False
-                    for t in tables:
-                        if t.bbox[1] - 1 <= avg_top <= t.bbox[3] + 1:
-                            in_table = True
-                            break
-                    if not in_table:
-                        filtered_lines.append((avg_top, line))
+                    if any(y0 <= avg_top <= y1 for y0, y1 in table_y_ranges):
+                        continue
+                    filtered_lines.append((avg_top, line))
 
                 # Reconstruct cells for text lines by splitting on horizontal gaps
                 elements = []
@@ -109,7 +107,7 @@ async def pdf_to_excel(
                     row_cells.append(" ".join(current_cell))
                     elements.append((avg_top, row_cells))
 
-                # Add tables
+                # Add tables (extract once; same content as before)
                 for t in tables:
                     elements.append((t.bbox[1], t.extract()))
 
@@ -136,7 +134,9 @@ async def pdf_to_excel(
         if ext == "xlsx":
             with pd.ExcelWriter(str(output_path), engine="openpyxl") as writer:
                 for name, df in pages_data:
-                    df.to_excel(writer, sheet_name=name, index=False, header=False)
+                    # Sheet names max 31 chars in Excel
+                    sheet = name[:31]
+                    df.to_excel(writer, sheet_name=sheet, index=False, header=False)
         else:
             combined_df = pd.concat([df for _, df in pages_data], ignore_index=True)
             combined_df.to_csv(str(output_path), index=False, header=False)
@@ -192,17 +192,24 @@ async def pdf_to_jpg(
     def _convert() -> None:
         import fitz  # PyMuPDF
 
+        # Reuse one scale matrix; alpha=False is correct for opaque JPEG output
+        # and avoids an unnecessary alpha channel allocation (same visual quality).
+        zoom = dpi / 72.0
+        matrix = fitz.Matrix(zoom, zoom)
+
         with fitz.open(str(input_path)) as doc, zipfile.ZipFile(
-            output_path, "w", zipfile.ZIP_DEFLATED
+            output_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6
         ) as archive:
             if doc.page_count == 0:
                 raise ValueError("The PDF has no pages to render.")
+            stem = input_path.stem
             for page_idx in range(doc.page_count):
-                pix = doc[page_idx].get_pixmap(dpi=dpi)
+                pix = doc[page_idx].get_pixmap(matrix=matrix, alpha=False)
                 archive.writestr(
-                    f"{input_path.stem}_page_{page_idx + 1:03d}.jpg",
+                    f"{stem}_page_{page_idx + 1:03d}.jpg",
                     pix.tobytes("jpg"),
                 )
+                pix = None  # help free large pixmap buffers sooner
 
     await asyncio.to_thread(_convert)
     if not output_path.is_file():

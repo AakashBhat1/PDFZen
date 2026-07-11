@@ -1,4 +1,4 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer } from '../utils.js';
+import { downloadBlob, formatBytes, fileToArrayBuffer, yieldToUI } from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
 
 export function initMerge(container) {
@@ -192,9 +192,12 @@ export function initMerge(container) {
         const percent = Math.floor(20 + (i / totalDocs) * 60);
         progressBar.style.width = `${percent}%`;
         
-        const donorPdf = await PDFDocument.load(item.arrayBuffer);
+        const donorPdf = await PDFDocument.load(item.arrayBuffer, { updateMetadata: false });
         const copiedPages = await mergedPdf.copyPages(donorPdf, donorPdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        for (const page of copiedPages) {
+          mergedPdf.addPage(page);
+        }
+        if (i % 2 === 1) await yieldToUI();
       }
       
       // 4. Save and compile

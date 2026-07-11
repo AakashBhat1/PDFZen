@@ -1,11 +1,8 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob, pdfjsDataFromBuffer } from '../utils.js';
 import { PDFDocument, rgb, PDFName } from 'pdf-lib';
 import { PDFDocument as CantooPDFDocument } from '@cantoo/pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { pdfjsLib } from '../pdfjs-setup.js';
 import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function createSecurityUI(container, title, subtitle, icon, isPasswordMode = false) {
   container.innerHTML = `
@@ -251,7 +248,7 @@ export function initRedact(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdf.numPages}`;
       
       const page = await pdf.getPage(1);

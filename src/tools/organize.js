@@ -1,10 +1,15 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas } from '../utils.js';
-import { etsplLogo } from './logo-base64.js';
+import {
+  downloadBlob,
+  formatBytes,
+  fileToArrayBuffer,
+  renderPDFPageToCanvas,
+  renderPDFPageToObjectUrl,
+  pdfjsDataFromBuffer,
+  yieldToUI
+} from '../utils.js';
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+import { pdfjsLib } from '../pdfjs-setup.js';
+import logoUrl from '../logo.png';
 
 // --- Shared PDF Input UI helper ---
 function createOrganizeUI(container, title, subtitle, icon) {
@@ -92,6 +97,14 @@ export function initOrganize(container) {
   let pageList = []; // Array of { originalIndex, id, canvasUrl }
   let pageCounter = 0;
 
+  function revokePageUrls(list) {
+    for (const item of list) {
+      if (item.canvasUrl && item.canvasUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.canvasUrl);
+      }
+    }
+  }
+
   ui.settingsFields.innerHTML = `
     <p class="form-help">Drag page thumbnails or click actions to rearrange, duplicate, or remove pages.</p>
     <button id="btn-add-blank-page" class="btn btn-secondary" style="width:100%; margin-top: 1rem;">
@@ -111,23 +124,25 @@ export function initOrganize(container) {
     ui.fileMeta.innerText = 'Extracting pages...';
 
     try {
+      revokePageUrls(pageList);
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
       for (let i = 1; i <= count; i++) {
         ui.fileMeta.innerText = `Loading thumbnails... Page ${i} of ${count}`;
         const page = await pdf.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, 0.4);
-        const canvasUrl = canvas.toDataURL();
-        
+        // Object URLs are far cheaper than base64 data URLs for preview grids
+        const canvasUrl = await renderPDFPageToObjectUrl(page, 0.4, 0.72);
+
         pageList.push({
           id: pageCounter++,
           originalIndex: i - 1, // 0-indexed
           type: 'original',
-          canvasUrl: canvasUrl
+          canvasUrl
         });
+        if (i % 3 === 0) await yieldToUI();
       }
 
       ui.fileMeta.innerText = `Pages: ${pageList.length} | Size: ${formatBytes(file.size)}`;
@@ -325,6 +340,14 @@ export function initRotate(container) {
   let selectedFile = null;
   let pageList = []; // Array of { id, originalIndex, rotationAngle, canvasUrl }
 
+  function revokeRotateUrls(list) {
+    for (const item of list) {
+      if (item.canvasUrl && item.canvasUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.canvasUrl);
+      }
+    }
+  }
+
   ui.settingsFields.innerHTML = `
     <div class="form-group">
       <label>Batch Rotate</label>
@@ -347,21 +370,23 @@ export function initRotate(container) {
     ui.fileMeta.innerText = 'Extracting pages...';
 
     try {
+      revokeRotateUrls(pageList);
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const count = pdf.numPages;
       pageList = [];
 
       for (let i = 1; i <= count; i++) {
         const page = await pdf.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, 0.4);
-        
+        const canvasUrl = await renderPDFPageToObjectUrl(page, 0.4, 0.72);
+
         pageList.push({
           id: i,
           originalIndex: i - 1,
           rotationAngle: 0, // In degrees (0, 90, 180, 270)
-          canvasUrl: canvas.toDataURL()
+          canvasUrl
         });
+        if (i % 3 === 0) await yieldToUI();
       }
 
       ui.fileMeta.innerText = `Pages: ${pageList.length}`;
@@ -511,12 +536,12 @@ export function initCrop(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      pdfDocInstance = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      pdfDocInstance = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       ui.fileMeta.innerText = `Total Pages: ${pdfDocInstance.numPages}`;
-      
+
       // Load page 1
       const page = await pdfDocInstance.getPage(1);
-      
+
       // Render page on editor container style
       scale = 1.0;
       cropPageCanvas = await renderPDFPageToCanvas(page, scale);
@@ -716,12 +741,12 @@ export function initPageNumbers(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages} | Ready to stamp page numbers.`;
-      
+
       // Load page 1 preview
       const page = await pdf.getPage(1);
-      const canvas = await renderPDFPageToCanvas(page, 0.4);
+      const canvas = await renderPDFPageToCanvas(page, 0.4, { alpha: false });
       ui.pagesGrid.innerHTML = '';
       ui.pagesGrid.appendChild(canvas);
       
@@ -839,14 +864,16 @@ export function initPageNumbers(container) {
 // ==========================================
 // 5. WATERMARK PDF
 // ==========================================
-function dataURIToArrayBuffer(dataURI) {
-  const byteString = atob(dataURI.split(',')[1]);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
+/** Cached ETSPL logo bytes (loaded once from PNG asset, not a 500KB+ base64 JS module). */
+let _etsplLogoBufferPromise = null;
+function loadEtsplLogoBuffer() {
+  if (!_etsplLogoBufferPromise) {
+    _etsplLogoBufferPromise = fetch(logoUrl).then(async (res) => {
+      if (!res.ok) throw new Error('Failed to load ETSPL logo asset');
+      return res.arrayBuffer();
+    });
   }
-  return ab;
+  return _etsplLogoBufferPromise;
 }
 
 export function initWatermark(container) {
@@ -949,14 +976,14 @@ export function initWatermark(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       ui.fileMeta.innerText = `Pages: ${pdf.numPages}`;
-      
+
       const page = await pdf.getPage(1);
-      const canvas = await renderPDFPageToCanvas(page, 0.4);
+      const canvas = await renderPDFPageToCanvas(page, 0.4, { alpha: false });
       ui.pagesGrid.innerHTML = '';
       ui.pagesGrid.appendChild(canvas);
-      
+
       ui.runBtn.disabled = false;
 
     } catch (err) {
@@ -967,7 +994,7 @@ export function initWatermark(container) {
 
   ui.runBtn.addEventListener('click', async () => {
     if (!fileBuffer) return;
-    
+
     const type = wmType.value;
     if (type === 'image' && !watermarkImgBuffer) {
       return alert('Please upload a watermark logo image first.');
@@ -1059,7 +1086,7 @@ export function initWatermark(container) {
         // Image Logo stamp
         let embedImg;
         if (type === 'etspl') {
-          const logoBuffer = dataURIToArrayBuffer(etsplLogo);
+          const logoBuffer = await loadEtsplLogoBuffer();
           embedImg = await pdfDoc.embedPng(logoBuffer);
         } else if (watermarkImgType === 'png') {
           embedImg = await pdfDoc.embedPng(watermarkImgBuffer);

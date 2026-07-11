@@ -72,34 +72,51 @@ function init() {
   indexSearch();
 }
 
-// 1. Search Indexing and Instant Filter
+// 1. Search Indexing and Instant Filter (pre-indexed text + debounced filter)
 function indexSearch() {
-  const cards = dom.toolCards;
-  
-  dom.searchBar.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    
-    // Reset category tabs to "All" when searching
+  const cards = Array.from(dom.toolCards).map((card) => ({
+    el: card,
+    section: card.closest('.tools-section'),
+    haystack: [
+      card.querySelector('h3')?.textContent || '',
+      card.querySelector('p')?.textContent || '',
+      card.dataset.tags || ''
+    ].join(' ').toLowerCase()
+  }));
+
+  const allCatBtn = document.querySelector('.cat-btn[data-category="all"]');
+  const catButtons = document.querySelectorAll('.cat-btn');
+  let searchTimer = null;
+
+  const applySearch = (rawQuery) => {
+    const query = rawQuery.toLowerCase().trim();
+
     if (query !== '') {
-      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-      document.querySelector('.cat-btn[data-category="all"]').classList.add('active');
+      catButtons.forEach((b) => b.classList.remove('active'));
+      allCatBtn?.classList.add('active');
     }
-    
-    cards.forEach(card => {
-      const title = card.querySelector('h3').textContent.toLowerCase();
-      const desc = card.querySelector('p').textContent.toLowerCase();
-      const tags = card.dataset.tags || '';
-      
-      const isMatch = title.includes(query) || desc.includes(query) || tags.includes(query);
-      card.style.display = isMatch ? 'flex' : 'none';
+
+    const visibleSections = new Set();
+    for (const item of cards) {
+      const isMatch = !query || item.haystack.includes(query);
+      item.el.style.display = isMatch ? 'flex' : 'none';
+      if (isMatch && item.section) visibleSections.add(item.section);
+    }
+
+    dom.toolsSections.forEach((section) => {
+      section.style.display = visibleSections.has(section) ? 'block' : 'none';
     });
-    
-    // Hide empty sections
-    dom.toolsSections.forEach(section => {
-      const sectionCards = section.querySelectorAll('.tool-card');
-      const visibleCount = Array.from(sectionCards).filter(c => c.style.display !== 'none').length;
-      section.style.display = visibleCount > 0 ? 'block' : 'none';
-    });
+  };
+
+  dom.searchBar.addEventListener('input', (e) => {
+    const value = e.target.value;
+    if (searchTimer) clearTimeout(searchTimer);
+    // Instant clear when emptied; slight debounce while typing
+    if (!value.trim()) {
+      applySearch('');
+      return;
+    }
+    searchTimer = setTimeout(() => applySearch(value), 80);
   });
 }
 
@@ -132,32 +149,22 @@ function filterCategory(category) {
 }
 
 // 3. Theme Management
+function applyTheme(theme) {
+  state.theme = theme;
+  const isLight = theme === 'light';
+  dom.body.classList.toggle('light-theme', isLight);
+  dom.body.classList.toggle('dark-theme', !isLight);
+  dom.themeToggleBtn.innerHTML = isLight
+    ? '<i class="bi bi-sun"></i>'
+    : '<i class="bi bi-moon-stars"></i>';
+}
+
 function loadSavedTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  state.theme = savedTheme;
-  if (savedTheme === 'light') {
-    dom.body.classList.remove('dark-theme');
-    dom.body.classList.add('light-theme');
-    dom.themeToggleBtn.innerHTML = '<i class="bi bi-sun"></i>';
-  } else {
-    dom.body.classList.remove('light-theme');
-    dom.body.classList.add('dark-theme');
-    dom.themeToggleBtn.innerHTML = '<i class="bi bi-moon-stars"></i>';
-  }
+  applyTheme(localStorage.getItem('theme') || 'dark');
 }
 
 function toggleTheme() {
-  if (state.theme === 'dark') {
-    state.theme = 'light';
-    dom.body.classList.remove('dark-theme');
-    dom.body.classList.add('light-theme');
-    dom.themeToggleBtn.innerHTML = '<i class="bi bi-sun"></i>';
-  } else {
-    state.theme = 'dark';
-    dom.body.classList.remove('light-theme');
-    dom.body.classList.add('dark-theme');
-    dom.themeToggleBtn.innerHTML = '<i class="bi bi-moon-stars"></i>';
-  }
+  applyTheme(state.theme === 'dark' ? 'light' : 'dark');
   localStorage.setItem('theme', state.theme);
 }
 

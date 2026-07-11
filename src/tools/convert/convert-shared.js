@@ -1,8 +1,5 @@
 import { fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from '../../utils.js';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+import { pdfjsLib } from '../../pdfjs-setup.js';
 
 export { pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas };
 

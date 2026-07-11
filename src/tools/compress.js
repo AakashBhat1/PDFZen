@@ -1,9 +1,15 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import {
+  downloadBlob,
+  formatBytes,
+  fileToArrayBuffer,
+  renderPDFPageToCanvas,
+  canvasToBlob,
+  pdfjsDataFromBuffer,
+  yieldToUI,
+  releaseCanvas
+} from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+import { pdfjsLib } from '../pdfjs-setup.js';
 
 export function initCompress(container) {
   let selectedFile = null;
@@ -142,8 +148,8 @@ export function initCompress(container) {
     
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       pageCount = pdf.numPages;
       fileMetaEl.innerText = `Pages: ${pageCount} | Current Size: ${formatBytes(file.size)}`;
       runBtn.disabled = false;
@@ -188,52 +194,59 @@ export function initCompress(container) {
 
     try {
       progressBar.style.width = '20%';
-      
-      const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+
+      const pdfjsDoc = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const pdfLibDoc = await PDFDocument.create();
-      
-      // 2. Process page-by-page
+
+      // 2. Process page-by-page (release each canvas after embed to cap peak memory)
       for (let i = 1; i <= pageCount; i++) {
         progressText.innerText = `Optimizing page ${i} of ${pageCount}...`;
         const percent = Math.floor(20 + (i / pageCount) * 70);
         progressBar.style.width = `${percent}%`;
-        
-        // Render PDF page to Canvas
+
         const page = await pdfjsDoc.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, scale);
-        
-        if (grayscale) {
-          const ctx = canvas.getContext('2d');
-          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imgData.data;
-          for (let j = 0; j < data.length; j += 4) {
-            const r = data[j];
-            const g = data[j+1];
-            const b = data[j+2];
-            // NTSC luma formula for standard grayscale conversion
-            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            data[j] = gray;
-            data[j+1] = gray;
-            data[j+2] = gray;
-          }
-          ctx.putImageData(imgData, 0, 0);
-        }
-        
-        // Downsample/Compress Canvas to JPEG Blob
-        const blob = await canvasToBlob(canvas, 'image/jpeg', jpegQuality);
-        const imgBuffer = await blob.arrayBuffer();
-        
-        // Add to new PDF Document
-        const embedImg = await pdfLibDoc.embedJpg(imgBuffer);
-        const { width, height } = embedImg.scale(1 / scale);
-        
-        const newPage = pdfLibDoc.addPage([width, height]);
-        newPage.drawImage(embedImg, {
-          x: 0,
-          y: 0,
-          width: width,
-          height: height
+        const canvas = await renderPDFPageToCanvas(page, scale, {
+          alpha: false,
+          willReadFrequently: grayscale
         });
+
+        try {
+          if (grayscale) {
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            for (let j = 0; j < data.length; j += 4) {
+              const r = data[j];
+              const g = data[j + 1];
+              const b = data[j + 2];
+              // NTSC luma formula for standard grayscale conversion
+              const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+              data[j] = gray;
+              data[j + 1] = gray;
+              data[j + 2] = gray;
+            }
+            ctx.putImageData(imgData, 0, 0);
+          }
+
+          const blob = await canvasToBlob(canvas, 'image/jpeg', jpegQuality);
+          const imgBuffer = await blob.arrayBuffer();
+
+          const embedImg = await pdfLibDoc.embedJpg(imgBuffer);
+          const { width, height } = embedImg.scale(1 / scale);
+
+          const newPage = pdfLibDoc.addPage([width, height]);
+          newPage.drawImage(embedImg, {
+            x: 0,
+            y: 0,
+            width,
+            height
+          });
+        } finally {
+          releaseCanvas(canvas);
+        }
+
+        // Keep the progress UI responsive on large PDFs
+        if (i % 2 === 0) await yieldToUI();
       }
       
       // 3. Compile PDF

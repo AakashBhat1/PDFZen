@@ -1,9 +1,14 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, downloadZipOfFiles } from '../utils.js';
+import {
+  downloadBlob,
+  formatBytes,
+  fileToArrayBuffer,
+  renderPDFPageToCanvas,
+  downloadZipOfFiles,
+  pdfjsDataFromBuffer,
+  yieldToUI
+} from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+import { pdfjsLib } from '../pdfjs-setup.js';
 
 export function initSplit(container) {
   let selectedFile = null;
@@ -221,7 +226,7 @@ export function initSplit(container) {
     try {
       fileBuffer = await fileToArrayBuffer(file);
       
-      pdfDocInstance = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      pdfDocInstance = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       pageCount = pdfDocInstance.numPages;
       fileMeta.innerText = `Pages: ${pageCount} | Size: ${formatBytes(file.size)}`;
       
@@ -242,19 +247,20 @@ export function initSplit(container) {
       const maxPreviews = Math.min(pageCount, 15);
       for (let i = 1; i <= maxPreviews; i++) {
         const page = await pdfDocInstance.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, 0.4); // Small scale
+        const canvas = await renderPDFPageToCanvas(page, 0.4, { alpha: false });
         canvas.className = 'page-thumbnail-canvas';
-        
+
         const card = document.createElement('div');
         card.className = 'page-thumbnail-card';
         card.appendChild(canvas);
-        
+
         const badge = document.createElement('span');
         badge.className = 'page-number-badge';
         badge.innerText = `${i}`;
         card.appendChild(badge);
-        
+
         pagesGrid.appendChild(card);
+        if (i % 4 === 0) await yieldToUI();
       }
       
       if (pageCount > 15) {

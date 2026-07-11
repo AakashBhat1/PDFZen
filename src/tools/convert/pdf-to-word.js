@@ -1,5 +1,6 @@
 import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import { Document, Paragraph, ImageRun, Packer, AlignmentType } from 'docx';
+import { pdfjsDataFromBuffer, yieldToUI, releaseCanvas } from '../../utils.js';
 
 // ==========================================
 // PDF TO WORD
@@ -94,7 +95,7 @@ async function convertImageBased(container, file, fileBuffer) {
   const progress = showProgressView(container, 'Rendering PDF pages...');
 
   try {
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
     const numPages = pdf.numPages;
     const docChildren = [];
 
@@ -103,29 +104,35 @@ async function convertImageBased(container, file, fileBuffer) {
       progress.progressBar.style.width = `${10 + (i / numPages) * 70}%`;
 
       const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2.5 });
+      // Keep scale 2.5 — same fidelity as before; free canvas after each page
       const canvas = await renderPDFPageToCanvas(page, 2.5);
 
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-      const imgBuffer = await blob.arrayBuffer();
+      try {
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encode failed'))), 'image/png');
+        });
+        const imgBuffer = await blob.arrayBuffer();
 
-      const targetWidthPx = 600;
-      const aspectRatio = viewport.height / viewport.width;
-      const targetHeightPx = Math.round(targetWidthPx * aspectRatio);
+        const targetWidthPx = 600;
+        const aspectRatio = canvas.height / canvas.width;
+        const targetHeightPx = Math.round(targetWidthPx * aspectRatio);
 
-      docChildren.push(new Paragraph({
-        children: [
-          new ImageRun({
-            type: 'png',
-            data: new Uint8Array(imgBuffer),
-            transformation: {
-              width: targetWidthPx,
-              height: targetHeightPx
-            }
-          })
-        ],
-        alignment: AlignmentType.CENTER
-      }));
+        docChildren.push(new Paragraph({
+          children: [
+            new ImageRun({
+              type: 'png',
+              data: new Uint8Array(imgBuffer),
+              transformation: {
+                width: targetWidthPx,
+                height: targetHeightPx
+              }
+            })
+          ],
+          alignment: AlignmentType.CENTER
+        }));
+      } finally {
+        releaseCanvas(canvas);
+      }
 
       if (i < numPages) {
         docChildren.push(new Paragraph({
@@ -133,6 +140,7 @@ async function convertImageBased(container, file, fileBuffer) {
           pageBreakBefore: true
         }));
       }
+      if (i % 2 === 0) await yieldToUI();
     }
 
     progress.progressText.innerText = 'Packaging Word document...';

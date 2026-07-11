@@ -151,36 +151,35 @@ def test_convert_office_to_pdf_unavailable():
 
 
 def test_proxy_webpage():
-    client = TestClient(app)
-    
     async def mock_get(url, **kwargs):
         class MockResponse:
             status_code = 200
             text = "<html><body>Test Webpage</body></html>"
         return MockResponse()
-        
-    with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=mock_get)):
-        response = client.get("/proxy/webpage?url=https://example.com")
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "text/html; charset=utf-8"
-        assert response.text == "<html><body>Test Webpage</body></html>"
+
+    # Shared AsyncClient is created in app lifespan (server.py).
+    with TestClient(app) as client:
+        with patch.object(app.state.http, "get", new=AsyncMock(side_effect=mock_get)):
+            response = client.get("/proxy/webpage?url=https://example.com")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/html; charset=utf-8"
+            assert response.text == "<html><body>Test Webpage</body></html>"
 
 
 def test_proxy_image():
-    client = TestClient(app)
-    
     async def mock_get(url, **kwargs):
         class MockResponse:
             status_code = 200
             content = b"fake image bytes"
             headers = {"content-type": "image/png"}
         return MockResponse()
-        
-    with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=mock_get)):
-        response = client.get("/proxy/image?url=https://example.com/logo.png")
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "image/png"
-        assert response.content == b"fake image bytes"
+
+    with TestClient(app) as client:
+        with patch.object(app.state.http, "get", new=AsyncMock(side_effect=mock_get)):
+            response = client.get("/proxy/image?url=https://example.com/logo.png")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "image/png"
+            assert response.content == b"fake image bytes"
 
 
 def test_empty_file_upload():

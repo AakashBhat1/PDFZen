@@ -1,10 +1,15 @@
-import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas } from '../utils.js';
+import {
+  downloadBlob,
+  formatBytes,
+  fileToArrayBuffer,
+  renderPDFPageToCanvas,
+  pdfjsDataFromBuffer,
+  yieldToUI,
+  releaseCanvas
+} from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { pdfjsLib } from '../pdfjs-setup.js';
 import Tesseract from 'tesseract.js';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 import { state } from '../main.js';
 
 // --- Shared AI Input Helper ---
@@ -392,7 +397,7 @@ export function initOcr(container) {
 
     // Show visual thumbnail preview
     try {
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const page = await pdf.getPage(1);
       const canvas = await renderPDFPageToCanvas(page, 0.4);
       ui.canvasContainer.innerHTML = '';
@@ -415,26 +420,32 @@ export function initOcr(container) {
     try {
       const statusTxt = container.querySelector('#ocr-load-status');
       
-      const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdfDoc = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const totalPages = pdfDoc.numPages;
       let fullOcrText = '';
 
       for (let i = 1; i <= totalPages; i++) {
         statusTxt.innerText = `Rendering page ${i} of ${totalPages} to image canvas...`;
         const page = await pdfDoc.getPage(i);
-        const canvas = await renderPDFPageToCanvas(page, 1.5); // high res for OCR accuracy
+        // Keep 1.5 scale for OCR accuracy; free canvas after each page
+        const canvas = await renderPDFPageToCanvas(page, 1.5);
 
-        statusTxt.innerText = `Running Character Recognition on page ${i} of ${totalPages}...`;
-        const result = await Tesseract.recognize(canvas, lang, {
-          logger: m => {
-            if (m.status === 'recognizing') {
-              statusTxt.innerText = `Page ${i}/${totalPages}: Recognizing text... ${Math.floor(m.progress * 100)}%`;
+        try {
+          statusTxt.innerText = `Running Character Recognition on page ${i} of ${totalPages}...`;
+          const result = await Tesseract.recognize(canvas, lang, {
+            logger: m => {
+              if (m.status === 'recognizing') {
+                statusTxt.innerText = `Page ${i}/${totalPages}: Recognizing text... ${Math.floor(m.progress * 100)}%`;
+              }
             }
-          }
-        });
-        
-        const text = result.data.text;
-        fullOcrText += `--- Page ${i} ---\n${text}\n\n`;
+          });
+
+          const text = result.data.text;
+          fullOcrText += `--- Page ${i} ---\n${text}\n\n`;
+        } finally {
+          releaseCanvas(canvas);
+        }
+        await yieldToUI();
       }
 
       ui.canvasContainer.innerHTML = '';
@@ -621,7 +632,7 @@ export function initForms(container) {
       ui.fileMeta.innerText = `Detected ${fields.length} form fields.`;
 
       // Render Page 1 to let user fill it
-      const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdfjsDoc = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const page1 = await pdfjsDoc.getPage(1);
       const canvas = await renderPDFPageToCanvas(page1, 1.2);
 

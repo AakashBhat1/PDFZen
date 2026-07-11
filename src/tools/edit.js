@@ -1,9 +1,6 @@
-import { downloadBlob, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { downloadBlob, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob, pdfjsDataFromBuffer, yieldToUI, releaseCanvas } from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+import { pdfjsLib } from '../pdfjs-setup.js';
 
 function createEditorUI(container, title, subtitle, isSignMode = false) {
   container.innerHTML = `
@@ -562,7 +559,7 @@ export function initEditPdf(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       
       const totalPages = pdf.numPages;
       ui.fileMeta.innerText = `Total Pages: ${totalPages}`;
@@ -836,7 +833,7 @@ export function initSign(container) {
 
     try {
       fileBuffer = await fileToArrayBuffer(file);
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBuffer.slice(0)) }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: pdfjsDataFromBuffer(fileBuffer) }).promise;
       const totalPages = pdf.numPages;
       ui.fileMeta.innerText = `Total Pages: ${totalPages}`;
       ui.workspaceGrid.innerHTML = '';
