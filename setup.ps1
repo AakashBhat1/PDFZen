@@ -158,6 +158,32 @@ if ($sofficeInstalled) {
     }
 }
 
+# --------------------------------------------------
+# 6. Generate Favicon & Create Desktop Shortcut
+# --------------------------------------------------
+Write-Host "`n--------------------------------------------------" -ForegroundColor Cyan
+Write-Host "Configuring Desktop Shortcut & App Logo..." -ForegroundColor Cyan
+Write-Host "--------------------------------------------------" -ForegroundColor Cyan
+
+$scriptRoot = $PSScriptRoot
+if (-not $scriptRoot) { $scriptRoot = Get-Location }
+
+try {
+    # Generate favicon
+    if (Test-CommandExists "uv") {
+        Write-Host "Generating favicon.ico..." -ForegroundColor Cyan
+        uv run python "$scriptRoot\convert_logo.py"
+    } else {
+        Write-Warning "uv not found. Skipping favicon conversion."
+    }
+    
+    # Create shortcut
+    Write-Host "Creating desktop shortcut..." -ForegroundColor Cyan
+    & "$scriptRoot\create_desktop_shortcut.ps1"
+} catch {
+    Write-Warning "Failed to set up shortcut/favicon: $_"
+}
+
 Write-Host "`n==================================================" -ForegroundColor Green
 Write-Host "Setup completed! You are ready to start PDFZen." -ForegroundColor Green
 Write-Host "Use 'start.bat' to launch the frontend & backend." -ForegroundColor Green
