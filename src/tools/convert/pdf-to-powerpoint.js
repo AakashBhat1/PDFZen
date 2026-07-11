@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
+import { createConvertUI, showErrorView, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 
 // ==========================================
 // PDF TO POWERPOINT
@@ -14,7 +14,6 @@ export function initPdfToPowerpoint(container) {
     settingsHTML: backendStatusFieldHTML('Start the local Python server with LibreOffice installed for high-fidelity conversion.')
   });
 
-  let fileBuffer = null;
   let file = null;
 
   refreshBackendStatus(container);
@@ -24,19 +23,18 @@ export function initPdfToPowerpoint(container) {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
 
-  async function processFile(f) {
+  function processFile(f) {
     file = f;
     ui.dropzone.style.display = 'none';
     ui.preview.style.display = 'block';
     ui.fileName.innerText = file.name;
     ui.fileMeta.innerText = 'PDF readied. Click Convert below.';
     ui.runBtn.disabled = false;
-    fileBuffer = await fileToArrayBuffer(file);
     refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
-    if (!file || !fileBuffer) return;
+    if (!file) return;
 
     const backend = await refreshBackendStatus(container);
 

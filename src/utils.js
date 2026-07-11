@@ -38,26 +38,6 @@ export function loadScript(url) {
 }
 
 /**
- * Dynamically loads a stylesheet from a CDN if not already loaded.
- * @param {string} url - Stylesheet URL
- * @returns {Promise<void>}
- */
-export function loadCSS(url) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`link[href="${url}"]`)) {
-      resolve();
-      return;
-    }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    link.onload = resolve;
-    link.onerror = reject;
-    document.head.appendChild(link);
-  });
-}
-
-/**
  * Formats bytes to human-readable size.
  * @param {number} bytes 
  * @param {number} decimals 

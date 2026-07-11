@@ -33,13 +33,9 @@ TOOL_LIMITS: dict[str, int] = {
     "default": 4,
 }
 
-# Per-tool timeouts in seconds (blueprint §2: LibreOffice 30 min; we use tighter
-# local-desktop values).
+# Per-tool timeouts in seconds (LibreOffice is the only pe.run tool today).
 TOOL_TIMEOUTS: dict[str, int] = {
     "libreoffice": 180,
-    "pdf2docx": 180,
-    "pdfplumber": 120,
-    "pymupdf": 120,
     "default": 120,
 }
 

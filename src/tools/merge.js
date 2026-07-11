@@ -1,4 +1,4 @@
-import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer } from '../utils.js';
+import { downloadBlob, formatBytes, fileToArrayBuffer } from '../utils.js';
 import { PDFDocument } from 'pdf-lib';
 
 export function initMerge(container) {

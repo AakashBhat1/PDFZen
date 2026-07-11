@@ -1,4 +1,4 @@
-import { createConvertUI, showSuccessView, showProgressView, showErrorView, fileToArrayBuffer, downloadBlob, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
+import { createConvertUI, showErrorView, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 
 // ==========================================
 // PDF TO JPG / CBZ
@@ -34,7 +34,6 @@ export function initPdfToJpg(container) {
     `
   });
 
-  let fileBuffer = null;
   let file = null;
 
   refreshBackendStatus(container);
@@ -44,19 +43,18 @@ export function initPdfToJpg(container) {
     if (e.target.files.length > 0) processFile(e.target.files[0]);
   });
 
-  async function processFile(f) {
+  function processFile(f) {
     file = f;
     ui.dropzone.style.display = 'none';
     ui.preview.style.display = 'block';
     ui.fileName.innerText = file.name;
     ui.fileMeta.innerText = 'PDF readied. Ready to render pages.';
     ui.runBtn.disabled = false;
-    fileBuffer = await fileToArrayBuffer(file);
     refreshBackendStatus(container);
   }
 
   ui.runBtn.addEventListener('click', async () => {
-    if (!file || !fileBuffer) return;
+    if (!file) return;
 
     const outputFormat = container.querySelector('#pdf-jpg-format').value;
     let dpi = parseInt(container.querySelector('#pdf-jpg-dpi').value) || 200;

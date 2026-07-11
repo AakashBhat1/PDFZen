@@ -1,10 +1,10 @@
-import { fileToArrayBuffer, downloadBlob, formatBytes, renderPDFPageToCanvas } from '../../utils.js';
+import { fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from '../../utils.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-export { pdfjsLib, fileToArrayBuffer, downloadBlob, formatBytes, renderPDFPageToCanvas };
+export { pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas };
 
 // --- Shared File Input & UI Builder Helper ---
 export function createConvertUI(container, options) {
@@ -59,47 +59,6 @@ export function createConvertUI(container, options) {
     settingsFields: container.querySelector('#convert-settings-fields'),
     imgGrid: container.querySelector('#image-preview-grid')
   };
-}
-
-// --- Text Extractor Helper for PDF Parsing ---
-export async function extractPDFText(arrayBuffer, progressCallback) {
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
-  const numPages = pdf.numPages;
-  const pagesText = []; // Array of arrays (lines of text)
-
-  for (let i = 1; i <= numPages; i++) {
-    if (progressCallback) progressCallback(i, numPages);
-    
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    
-    // Group text items by y-coordinate (lines)
-    const lineMap = {};
-    textContent.items.forEach(item => {
-      const y = Math.round(item.transform[5]); // Y coordinate
-      if (!lineMap[y]) {
-        lineMap[y] = [];
-      }
-      lineMap[y].push(item);
-    });
-
-    // Sort lines from top to bottom
-    const sortedY = Object.keys(lineMap).map(Number).sort((a, b) => b - a);
-    const pageLines = [];
-    
-    sortedY.forEach(y => {
-      // Sort items within line from left to right
-      const lineItems = lineMap[y].sort((a, b) => a.transform[4] - b.transform[4]);
-      const lineStr = lineItems.map(item => item.str).join(' ').trim();
-      if (lineStr) {
-        pageLines.push(lineStr);
-      }
-    });
-
-    pagesText.push(pageLines);
-  }
-
-  return pagesText;
 }
 
 // --- Showing Success Panel Helper ---

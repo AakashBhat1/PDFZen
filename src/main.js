@@ -1,5 +1,3 @@
-import { loadScript } from './utils.js';
-
 // Global App State
 const state = {
   currentTool: null,

@@ -14,11 +14,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 import tempfile
 from pathlib import Path
-import shutil
-import httpx
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -50,6 +50,10 @@ app.add_middleware(
 _DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+_PROXY_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
 
 
 def _safe_stem(filename: str | None) -> str:
@@ -108,6 +112,18 @@ async def _run_conversion(file: UploadFile, converter, output_media_type: str, d
         return JSONResponse(status_code=500, content={"detail": f"Conversion failed: {exc}"})
 
 
+async def _run_libreoffice_conversion(
+    file: UploadFile, converter, output_media_type: str, download_name: str, tool_label: str
+):
+    """Like ``_run_conversion`` but returns 503 when LibreOffice is missing."""
+    if not libreoffice_available():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": f"LibreOffice is required for {tool_label} but was not found."},
+        )
+    return await _run_conversion(file, converter, output_media_type, download_name)
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "libreoffice": libreoffice_available()}
@@ -133,13 +149,12 @@ async def convert_pdf_to_excel(file: UploadFile = File(...), format: str = Form(
 
 @app.post("/convert/pdf-to-powerpoint")
 async def convert_pdf_to_powerpoint(file: UploadFile = File(...)):
-    if not libreoffice_available():
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "LibreOffice is required for PDF-to-PowerPoint but was not found."},
-        )
-    return await _run_conversion(
-        file, converters.pdf_to_powerpoint, _PPTX_MIME, f"{_safe_stem(file.filename)}.pptx"
+    return await _run_libreoffice_conversion(
+        file,
+        converters.pdf_to_powerpoint,
+        _PPTX_MIME,
+        f"{_safe_stem(file.filename)}.pptx",
+        "PDF-to-PowerPoint",
     )
 
 
@@ -164,40 +179,35 @@ async def convert_pdf_to_jpg(file: UploadFile = File(...), dpi: int = Form(200))
 
 @app.post("/convert/word-to-pdf")
 async def convert_word_to_pdf(file: UploadFile = File(...)):
-    if not libreoffice_available():
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "LibreOffice is required for Word-to-PDF but was not found."},
-        )
-    return await _run_conversion(
-        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    return await _run_libreoffice_conversion(
+        file,
+        converters.office_to_pdf,
+        "application/pdf",
+        f"{_safe_stem(file.filename)}.pdf",
+        "Word-to-PDF",
     )
 
 
 @app.post("/convert/excel-to-pdf")
 async def convert_excel_to_pdf(file: UploadFile = File(...)):
-    if not libreoffice_available():
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "LibreOffice is required for Excel-to-PDF but was not found."},
-        )
-    return await _run_conversion(
-        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    return await _run_libreoffice_conversion(
+        file,
+        converters.office_to_pdf,
+        "application/pdf",
+        f"{_safe_stem(file.filename)}.pdf",
+        "Excel-to-PDF",
     )
 
 
 @app.post("/convert/powerpoint-to-pdf")
 async def convert_powerpoint_to_pdf(file: UploadFile = File(...)):
-    if not libreoffice_available():
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "LibreOffice is required for PowerPoint-to-PDF but was not found."},
-        )
-    return await _run_conversion(
-        file, converters.office_to_pdf, "application/pdf", f"{_safe_stem(file.filename)}.pdf"
+    return await _run_libreoffice_conversion(
+        file,
+        converters.office_to_pdf,
+        "application/pdf",
+        f"{_safe_stem(file.filename)}.pdf",
+        "PowerPoint-to-PDF",
     )
-
-
 
 
 @app.get("/proxy/webpage")
@@ -205,18 +215,22 @@ async def proxy_webpage(url: str):
     """Proxy external webpages to bypass CORS for client-side loading."""
     try:
         async with httpx.AsyncClient() as client:
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-            }
-            resp = await client.get(url, headers=headers, follow_redirects=True, timeout=15.0)
+            resp = await client.get(
+                url,
+                headers={"User-Agent": _PROXY_UA},
+                follow_redirects=True,
+                timeout=15.0,
+            )
             if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch webpage: HTTP {resp.status_code}")
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=f"Failed to fetch webpage: HTTP {resp.status_code}",
+                )
             return Response(content=resp.text, media_type="text/html")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Webpage proxy failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Webpage proxy failed: {e}") from e
 
 
 @app.get("/proxy/image")
@@ -226,10 +240,18 @@ async def proxy_image(url: str):
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, follow_redirects=True, timeout=10.0)
             if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=f"Failed to fetch image: HTTP {resp.status_code}")
-            return Response(content=resp.content, media_type=resp.headers.get("content-type", "image/jpeg"))
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=f"Failed to fetch image: HTTP {resp.status_code}",
+                )
+            return Response(
+                content=resp.content,
+                media_type=resp.headers.get("content-type", "image/jpeg"),
+            )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image proxy failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Image proxy failed: {e}") from e
 
 
 if __name__ == "__main__":

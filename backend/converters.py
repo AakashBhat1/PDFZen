@@ -21,9 +21,6 @@ from pathlib import Path
 
 from . import libreoffice
 
-# openpyxl sheet names are capped at 31 characters.
-_MAX_SHEET_NAME = 31
-
 
 async def pdf_to_word(input_path: str | Path, out_dir: str | Path) -> Path:
     """PDF -> DOCX via pdf2docx (preserves layout, tables, and embedded images)."""

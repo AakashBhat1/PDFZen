@@ -1,5 +1,5 @@
-import { loadScript, downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
-import { PDFDocument, rgb, PDFName, PDFDict } from 'pdf-lib';
+import { downloadBlob, formatBytes, fileToArrayBuffer, renderPDFPageToCanvas, canvasToBlob } from '../utils.js';
+import { PDFDocument, rgb, PDFName } from 'pdf-lib';
 import { PDFDocument as CantooPDFDocument } from '@cantoo/pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';

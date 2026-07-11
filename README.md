@@ -51,15 +51,16 @@ PDFZen is a premium, client-side, single-page web application (SPA) offering a c
 ## Hybrid Architecture & High-Fidelity Local Backend
 
 PDFZen runs as a hybrid desktop utility:
-1. **Client-Side Engine**: By default, conversions run fully in-browser using client-side JavaScript engines (Mammoth.js, pptxgenjs, pdf.js, xlsx, etc.). This ensures zero server overhead and complete privacy.
-2. **Optional Local Python Backend**: To close the layout and image fidelity gap compared to cloud tools like *iLovePDF* or *Stirling-PDF*, PDFZen integrates with an optional local FastAPI backend. When running, the frontend automatically detects it via `/health` and routes conversion requests through high-performance Python libraries:
+1. **Client-Side Engine**: Browser tools (merge, split, edit, OCR, HTML/Office→PDF fallbacks) run fully in-browser using pdf.js, pdf-lib, mammoth, xlsx, html2pdf, tesseract, etc.
+2. **Local Python Backend**: High-fidelity PDF→Word/Excel/PowerPoint/JPG/Markdown conversions require the FastAPI backend. The frontend probes `/health` and routes those requests through Python libraries:
    - **PDF -> Word**: Uses `pdf2docx` to preserve complex layouts, columns, tables, and embed images.
    - **PDF -> Excel**: Uses `pdfplumber` + `pandas` to reconstruct spreadsheet tables.
    - **PDF -> PowerPoint**: Uses LibreOffice `soffice` to generate editable PPTX slides from page vectors.
    - **PDF -> JPG**: Uses PyMuPDF's fast and sharp raster rendering (with customizable DPI settings).
    - **PDF -> Markdown**: Uses `pymupdf4llm` for clean, structure-aware output.
+   - **Office -> PDF**: Uses LibreOffice when available, with browser html2pdf fallbacks for Word/Excel/PPTX.
 
-If the backend is not running, the application silently falls back to the client-side browser engines.
+Some convert tools (PDF→Excel/PPT/Markdown/JPG, and rich PDF→Word) require the backend to be running.
 
 ---
 
@@ -73,7 +74,6 @@ If the backend is not running, the application silently falls back to the client
     *   `mammoth.js` (Word parsing)
     *   `docx.js` (Word generation)
     *   `xlsx` SheetJS (Excel processing)
-    *   `pptxgenjs` (PowerPoint generation)
     *   `jszip` (ZIP packages)
     *   `tesseract.js` (OCR text engine)
     *   `html2pdf.js` (HTML printing)

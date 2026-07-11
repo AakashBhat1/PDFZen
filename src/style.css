@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Dancing+Script:wght@600&family=Great+Vibes&family=Pacifico&display=swap');
+
 /* Design System & Tokens */
 :root {
   --font-sans: 'Inter', sans-serif;
@@ -1148,4 +1150,177 @@ body.light-theme .progress-bar-wrapper {
   justify-content: center;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+/* ==========================================
+   EDIT & SIGN PDF ENHANCEMENTS
+   ========================================== */
+
+/* Cursive fonts for typing signatures */
+.sig-font-dancing {
+  font-family: 'Dancing Script', cursive;
+  font-size: 28px !important;
+}
+.sig-font-greatvibes {
+  font-family: 'Great Vibes', cursive;
+  font-size: 32px !important;
+}
+.sig-font-pacifico {
+  font-family: 'Pacifico', cursive;
+  font-size: 24px !important;
+}
+.sig-font-alexbrush {
+  font-family: 'Alex Brush', cursive;
+  font-size: 30px !important;
+}
+
+/* Toolbar styling for Edit PDF */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  padding: 0.6rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  align-items: center;
+  width: 100%;
+}
+.editor-toolbar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+.editor-toolbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.editor-toolbar-btn.active {
+  background: var(--primary-gradient);
+  color: white;
+  border-color: transparent;
+}
+.editor-toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border-card);
+  margin: 0 0.25rem;
+}
+
+/* Signature tabs */
+.sig-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-card);
+  margin-bottom: 1rem;
+  width: 100%;
+}
+.sig-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-fast);
+}
+.sig-tab-btn:hover {
+  color: var(--text-main);
+}
+.sig-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+.sig-tab-content {
+  display: none;
+  width: 100%;
+}
+.sig-tab-content.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Placed annotations on the page */
+.placed-element {
+  position: absolute;
+  z-index: 30;
+  cursor: move;
+  border: 1.5px dashed rgba(99, 102, 241, 0.6);
+  user-select: none;
+  padding: 2px;
+  box-sizing: border-box;
+}
+.placed-element.selected {
+  border: 1.5px solid var(--primary-color);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+.placed-element .delete-handle {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  background: var(--color-red);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 40;
+  opacity: 0;
+  transition: var(--transition-fast);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+.placed-element:hover .delete-handle,
+.placed-element.selected .delete-handle {
+  opacity: 1;
+}
+.placed-element .resize-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: var(--primary-color);
+  cursor: se-resize;
+  border-radius: 50%;
+  z-index: 40;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.editor-workspace {
+  max-height: 75vh !important;
+  gap: 1.5rem;
+}
+
+.editor-page-container {
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.page-badge {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
