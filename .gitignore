@@ -3,26 +3,28 @@ node_modules/
 .pnp
 .pnp.js
 
-# Testing
+# Testing / coverage
 coverage/
+.pytest_cache/
+.playwright-mcp/
 
-# Production Build
+# Production build
 dist/
 build/
 
-# Python Virtual Environment
+# Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.python-version
 
-# Local Configs
+# Local env / secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
-# IDE/Editor Configs
+# IDE / OS
 .idea/
 .vscode/
 *.suo
@@ -31,13 +33,17 @@ __pycache__/
 *.sln
 *.sw?
 .DS_Store
+Thumbs.db
 
-# Log files
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-test
-docs
-.agents
-.playwright-mcp
+
+# Large local sample PDFs (fixtures; not part of source)
+public/samples/
+
+# Local design notes / agent scratch (canonical docs live in second_brain vault)
+docs/
+.agents/

@@ -1,5 +1,5 @@
-import { fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from '../../utils.js';
-import { pdfjsLib } from '../../pdfjs-setup.js';
+import { fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas } from '../../lib/utils.js';
+import { pdfjsLib } from '../../lib/pdfjs-setup.js';
 
 export { pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas };
 

@@ -6,9 +6,9 @@ import {
   downloadZipOfFiles,
   pdfjsDataFromBuffer,
   yieldToUI
-} from '../utils.js';
+} from '../lib/utils.js';
 import { PDFDocument } from 'pdf-lib';
-import { pdfjsLib } from '../pdfjs-setup.js';
+import { pdfjsLib } from '../lib/pdfjs-setup.js';
 
 export function initSplit(container) {
   let selectedFile = null;
@@ -106,7 +106,7 @@ export function initSplit(container) {
     try {
       btnLoadTestPdf.innerText = 'Loading...';
       btnLoadTestPdf.disabled = true;
-      const res = await fetch('/test/Visit report 030726 Yk-54.pdf');
+      const res = await fetch('/samples/Visit report 030726 Yk-54.pdf');
       if (!res.ok) throw new Error('Failed to fetch test PDF');
       const blob = await res.blob();
       const file = new File([blob], 'Visit report 030726 Yk-54.pdf', { type: 'application/pdf' });

@@ -64,6 +64,32 @@ Some convert tools (PDF→Excel/PPT/Markdown/JPG, and rich PDF→Word) require t
 
 ---
 
+## Project Layout
+
+```text
+multi-tool/
+  server.py              # FastAPI entry (conversion backend)
+  backend/               # converters, LibreOffice, process executor
+  src/
+    main.js              # app shell + lazy tool routing
+    style.css
+    lib/                 # shared utils + pdf.js bootstrap
+    assets/              # logo and static images
+    tools/
+      merge.js, split.js, compress.js
+      organize/          # organize, rotate, crop, page numbers, watermark
+      edit/              # edit PDF, sign
+      security/          # protect, unlock, redact, repair, PDF/A
+      ai/                # summarizer, translate, OCR, compare, forms, scan
+      convert/           # PDF ↔ Office / image / HTML tools
+  public/samples/        # local fixture PDFs (gitignored)
+  scripts/               # setup helpers (favicon, desktop shortcut)
+  scripts/dev/           # one-off scratch converters
+  tests/                 # pytest suite
+```
+
+---
+
 ## Technology Stack
 
 *   **Bundler**: Vite (Vanilla JS ES modules)

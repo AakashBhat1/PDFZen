@@ -5,6 +5,8 @@ export default defineConfig({
     port: 3000,
     open: true
   },
+  // static files (favicon, sample PDFs) live in public/ → served as /favicon.ico, /samples/...
+  publicDir: 'public',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

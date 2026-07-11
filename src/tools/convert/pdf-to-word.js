@@ -1,6 +1,6 @@
 import { createConvertUI, showSuccessView, showProgressView, showErrorView, pdfjsLib, fileToArrayBuffer, downloadBlob, renderPDFPageToCanvas, backendStatusFieldHTML, refreshBackendStatus, convertViaBackend } from './convert-shared.js';
 import { Document, Paragraph, ImageRun, Packer, AlignmentType } from 'docx';
-import { pdfjsDataFromBuffer, yieldToUI, releaseCanvas } from '../../utils.js';
+import { pdfjsDataFromBuffer, yieldToUI, releaseCanvas } from '../../lib/utils.js';
 
 // ==========================================
 // PDF TO WORD

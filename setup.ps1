@@ -172,14 +172,14 @@ try {
     # Generate favicon
     if (Test-CommandExists "uv") {
         Write-Host "Generating favicon.ico..." -ForegroundColor Cyan
-        uv run python "$scriptRoot\convert_logo.py"
+        uv run python "$scriptRoot\scripts\convert_logo.py"
     } else {
         Write-Warning "uv not found. Skipping favicon conversion."
     }
     
     # Create shortcut
     Write-Host "Creating desktop shortcut..." -ForegroundColor Cyan
-    & "$scriptRoot\create_desktop_shortcut.ps1"
+    & "$scriptRoot\scripts\create_desktop_shortcut.ps1"
 } catch {
     Write-Warning "Failed to set up shortcut/favicon: $_"
 }

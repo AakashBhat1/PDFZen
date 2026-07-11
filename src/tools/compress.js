@@ -7,9 +7,9 @@ import {
   pdfjsDataFromBuffer,
   yieldToUI,
   releaseCanvas
-} from '../utils.js';
+} from '../lib/utils.js';
 import { PDFDocument } from 'pdf-lib';
-import { pdfjsLib } from '../pdfjs-setup.js';
+import { pdfjsLib } from '../lib/pdfjs-setup.js';
 
 export function initCompress(container) {
   let selectedFile = null;
@@ -101,7 +101,7 @@ export function initCompress(container) {
     try {
       btnLoadTestPdf.innerText = 'Loading...';
       btnLoadTestPdf.disabled = true;
-      const res = await fetch('/test/MyDefence_Digital_Catalogue_June_2026.pdf');
+      const res = await fetch('/samples/MyDefence_Digital_Catalogue_June_2026.pdf');
       if (!res.ok) throw new Error('Failed to fetch test PDF');
       const blob = await res.blob();
       const file = new File([blob], 'MyDefence_Digital_Catalogue_June_2026.pdf', { type: 'application/pdf' });

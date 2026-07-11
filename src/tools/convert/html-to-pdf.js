@@ -1,5 +1,5 @@
 import { showSuccessView, showProgressView, showErrorView, downloadBlob, refreshBackendStatus } from './convert-shared.js';
-import { loadScript } from '../../utils.js';
+import { loadScript } from '../../lib/utils.js';
 import html2pdf from 'html2pdf.js';
 
 // ==========================================
