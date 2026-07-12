@@ -3,7 +3,7 @@ import {
   fileToArrayBuffer
 } from '../../lib/utils.js';
 import { state } from '../../main.js';
-import { callGemini, createAIUI, getPDFRawText } from './shared.js';
+import { aiProviderLabel, callAI, createAIUI, getPDFRawText } from './shared.js';
 
 export function initTranslate(container) {
   const ui = createAIUI(container, {
@@ -57,9 +57,12 @@ export function initTranslate(container) {
 
   ui.runBtn.addEventListener('click', async () => {
     const lang = container.querySelector('#trans-lang').value;
-    const apiKey = state.geminiKey;
+    const provider = state.aiProvider || 'gemini';
+    const canRun =
+      (provider === 'gemini' && !!state.geminiKey) ||
+      provider === 'ollama';
 
-    if (!apiKey) {
+    if (!canRun) {
       showMockTranslation(lang);
       return;
     }
@@ -67,14 +70,22 @@ export function initTranslate(container) {
     ui.canvasContainer.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem; width:100%; padding:2rem 0;">
         <div class="spinner"></div>
-        <p style="font-size:0.9rem;">Translating to ${lang}...</p>
+        <p style="font-size:0.9rem;">Translating to ${lang} via ${aiProviderLabel(provider)}...</p>
       </div>
     `;
     ui.runBtn.disabled = true;
 
     try {
-      const prompt = `You are an expert translator. Translate the following text content accurately into ${lang}. Maintain paragraph layouts. Do not add comments or annotations, just return the translated text.\n\nTEXT TO TRANSLATE:\n${pdfTextContent.substring(0, 30000)}`;
-      const translatedText = await callGemini(prompt, apiKey);
+      const isOllama = provider === 'ollama';
+      const textCap = isOllama ? 12000 : 30000;
+      const prompt = `You are an expert translator. Translate the following text content accurately into ${lang}. Maintain paragraph layouts. Do not add comments or annotations, just return the translated text.\n\nTEXT TO TRANSLATE:\n${pdfTextContent.substring(0, textCap)}`;
+      const translatedText = await callAI(prompt, {
+        provider,
+        geminiKey: state.geminiKey,
+        ollamaUrl: state.ollamaUrl,
+        ollamaModel: state.ollamaModel,
+        numCtx: isOllama ? 16384 : undefined
+      });
       showResultTranslation(translatedText, lang);
     } catch (err) {
       console.error(err);

@@ -8,7 +8,7 @@
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Merriweather:wght@400;700&family=Source+Serif+4:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <!-- Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
   <!-- App Styles -->
@@ -37,8 +37,8 @@
       </div>
 
       <div class="header-actions">
-        <button id="btn-api-settings" class="btn btn-secondary" title="Configure AI Keys">
-          <i class="bi bi-cpu"></i> <span>Gemini Key</span>
+        <button id="btn-api-settings" class="btn btn-secondary" title="AI & appearance settings">
+          <i class="bi bi-sliders"></i> <span>Settings</span>
         </button>
         <button id="theme-toggle" class="btn btn-icon" title="Toggle Light/Dark Theme">
           <i class="bi bi-moon-stars"></i>
@@ -228,10 +228,10 @@
           <section class="tools-section" data-section="ai">
             <h2 class="section-title">AI & Advanced</h2>
             <div class="tools-grid">
-              <div class="tool-card" data-tool="ai-summarizer" data-category="ai" data-tags="ai summarizer summary article keypoints essay gemini smart">
+              <div class="tool-card" data-tool="ai-summarizer" data-category="ai" data-tags="ai summarizer summary article keypoints essay gemini smart page scanner single page analyzer">
                 <div class="tool-icon accent-indigo"><i class="bi bi-stars"></i></div>
-                <h3>AI Summarizer</h3>
-                <p>Quickly generate concise summaries, outlines, and key points from articles.</p>
+                <h3>AI Page Analyzer</h3>
+                <p>Pick one PDF page and analyze only that page with Gemini or local Ollama.</p>
               </div>
               <div class="tool-card" data-tool="translate" data-category="ai" data-tags="translate ai translator foreign language gemini text convert">
                 <div class="tool-icon accent-purple"><i class="bi bi-translate"></i></div>
@@ -278,27 +278,107 @@
     </main>
   </div>
 
-  <!-- Global Settings (Gemini API Key Modal) -->
+  <!-- Global Settings (AI + appearance) -->
   <div id="modal-settings" class="modal-overlay">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
-        <h3><i class="bi bi-cpu"></i> Gemini AI Configuration</h3>
+        <h3><i class="bi bi-sliders"></i> Settings</h3>
         <button class="modal-close" id="settings-close"><i class="bi bi-x-lg"></i></button>
       </div>
-      <div class="modal-body">
-        <p>To enable the **AI Summarizer** and **Translate PDF** features, please provide a Gemini API Key. Your key is stored locally in your browser and is sent directly to Google APIs.</p>
+      <div class="modal-body" style="align-items: stretch; gap: 1rem;">
+        <p style="margin:0; color: var(--text-muted); font-size: 0.9rem;">
+          Configure AI providers and appearance. Everything is stored only in this browser.
+        </p>
+
         <div class="form-group">
+          <label for="ai-provider-select">AI Provider</label>
+          <select id="ai-provider-select" class="form-control">
+            <option value="gemini">Google Gemini (cloud API key)</option>
+            <option value="ollama">Local Ollama (private, offline)</option>
+          </select>
+        </div>
+
+        <div id="settings-gemini-block" class="form-group">
           <label for="gemini-key-input">Gemini API Key</label>
           <div class="input-with-button">
             <input type="password" id="gemini-key-input" placeholder="AIzaSy...">
-            <button id="btn-toggle-key-visibility" class="btn btn-icon-small"><i class="bi bi-eye"></i></button>
+            <button id="btn-toggle-key-visibility" class="btn btn-icon-small" type="button"><i class="bi bi-eye"></i></button>
           </div>
-          <span class="form-help">No key? The app will operate in a simulated mockup mode for demonstration.</span>
+          <span class="form-help">Used by Summarizer &amp; Translate. Key stays on your machine.</span>
+        </div>
+
+        <div id="settings-ollama-block" class="form-group" style="display:none;">
+          <label for="ollama-url-input">Ollama Base URL</label>
+          <input type="text" id="ollama-url-input" class="form-control" placeholder="http://localhost:11434" value="http://localhost:11434">
+          <label for="ollama-model-input" style="margin-top:0.75rem;">Model name</label>
+          <input type="text" id="ollama-model-input" class="form-control" placeholder="huihui_ai/qwen3-vl-abliterated:8b" value="huihui_ai/qwen3-vl-abliterated:8b">
+          <span class="form-help" style="margin-top:0.5rem; display:block;">
+            Default (~8B <strong>abliterated + vision</strong>):
+            <code>huihui_ai/qwen3-vl-abliterated:8b</code>
+            (or <code>:8b-instruct</code> / smaller <code>:4b</code> / <code>:2b</code>).
+            Pull: <code>ollama pull huihui_ai/qwen3-vl-abliterated:8b</code>.
+            Browser CORS: <code>OLLAMA_ORIGINS=http://localhost:3000</code>.
+            <code>start.bat</code> launches Ollama with <code>OLLAMA_VULKAN=1</code> (iGPU).
+            Ollama does not use Windows NPUs.
+          </span>
+        </div>
+
+        <div class="form-group" style="border-top:1px solid var(--border-card); padding-top:1rem; margin-top:0.25rem;">
+          <label>App appearance</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-top:0.5rem;">
+            <div>
+              <label for="app-mode-select" class="form-help" style="display:block; margin-bottom:0.25rem;">Mode</label>
+              <select id="app-mode-select" class="form-control">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+            <div>
+              <label for="app-accent-select" class="form-help" style="display:block; margin-bottom:0.25rem;">Color theme</label>
+              <select id="app-accent-select" class="form-control">
+                <option value="indigo">Indigo</option>
+                <option value="ocean">Ocean</option>
+                <option value="forest">Forest</option>
+                <option value="sunset">Sunset</option>
+                <option value="rose">Rose</option>
+                <option value="slate">Slate</option>
+              </select>
+            </div>
+          </div>
+          <label for="app-font-select" class="form-help" style="display:block; margin:0.75rem 0 0.25rem;">UI font</label>
+          <select id="app-font-select" class="form-control">
+            <option value="inter">Inter (default)</option>
+            <option value="outfit">Outfit</option>
+            <option value="serif">Source Serif</option>
+            <option value="merriweather">Merriweather</option>
+            <option value="mono">JetBrains Mono</option>
+            <option value="system">System UI</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="border-top:1px solid var(--border-card); padding-top:1rem; margin-top:0.25rem;">
+          <label><i class="bi bi-terminal"></i> Service logs</label>
+          <span class="form-help" style="display:block; margin:0.35rem 0 0.5rem;">
+            Background process logs from <code>start.bat</code> (Ollama, backend, frontend) plus recent AI calls in this browser.
+          </span>
+          <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem;">
+            <select id="log-file-select" class="form-control" style="flex:1; min-width:8rem;">
+              <option value="ollama">Ollama</option>
+              <option value="backend">Backend</option>
+              <option value="frontend">Frontend</option>
+              <option value="launcher">Launcher</option>
+              <option value="client-ai">This browser (AI calls)</option>
+            </select>
+            <button type="button" id="btn-refresh-logs" class="btn btn-secondary">Refresh</button>
+            <button type="button" id="btn-open-logs-folder" class="btn btn-secondary" title="Copy logs folder path">Copy path</button>
+          </div>
+          <pre id="service-log-view" style="margin:0; max-height:220px; overflow:auto; font-size:0.72rem; line-height:1.35; padding:0.65rem; border-radius:8px; border:1px solid var(--border-card); background:rgba(0,0,0,0.25); white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, Consolas, monospace;">Click Refresh to load logs…</pre>
+          <span class="form-help" id="service-log-meta" style="display:block; margin-top:0.35rem;"></span>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-clear-settings" class="btn btn-danger">Clear Key</button>
-        <button id="btn-save-settings" class="btn btn-primary">Save Key</button>
+        <button id="btn-clear-settings" class="btn btn-danger" type="button">Reset AI</button>
+        <button id="btn-save-settings" class="btn btn-primary" type="button">Save Settings</button>
       </div>
     </div>
   </div>

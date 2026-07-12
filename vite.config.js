@@ -3,7 +3,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
     port: 3000,
-    open: true
+    // Launcher opens /?tool=ai-summarizer; keep this false so only one browser tab appears
+    open: false
   },
   // static files (favicon, sample PDFs) live in public/ → served as /favicon.ico, /samples/...
   publicDir: 'public',

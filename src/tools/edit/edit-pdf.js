@@ -298,36 +298,37 @@ export function initEditPdf(container) {
 
   // Baking and Saving compiler
   ui.runBtn.addEventListener('click', async () => {
-    container.innerHTML = `
-      <div class="workspace-main-panel" style="grid-column: span 2;">
-        <div class="processing-container">
-          <div class="spinner"></div>
-          <p class="processing-text">Baking annotations and compiling PDF...</p>
-        </div>
-      </div>
-    `;
-
+    ui.runBtn.disabled = true;
     try {
+      // Bake while DOM is still mounted (detached nodes report zero layout sizes)
+      const bakedOverlays = [];
+      for (const pc of pageContainers) {
+        const overlayBlob = await bakeElementsAndGetBlob(pc);
+        bakedOverlays.push({ pageIdx: pc.pageNum - 1, overlayBlob });
+      }
+
+      container.innerHTML = `
+        <div class="workspace-main-panel" style="grid-column: span 2;">
+          <div class="processing-container">
+            <div class="spinner"></div>
+            <p class="processing-text">Compiling annotated PDF...</p>
+          </div>
+        </div>
+      `;
+
       const pdfDoc = await PDFDocument.load(fileBuffer);
       const pages = pdfDoc.getPages();
 
-      for (const pc of pageContainers) {
-        const pageIdx = pc.pageNum - 1;
+      for (const { pageIdx, overlayBlob } of bakedOverlays) {
         if (pageIdx >= pages.length) continue;
-        
         const page = pages[pageIdx];
-        const overlayBlob = await bakeElementsAndGetBlob(pc);
         const overlayBuffer = await overlayBlob.arrayBuffer();
-
         const embedImg = await pdfDoc.embedPng(overlayBuffer);
-        const pageW = page.getWidth();
-        const pageH = page.getHeight();
-
         page.drawImage(embedImg, {
           x: 0,
           y: 0,
-          width: pageW,
-          height: pageH
+          width: page.getWidth(),
+          height: page.getHeight()
         });
       }
 

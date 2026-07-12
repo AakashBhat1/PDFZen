@@ -56,6 +56,56 @@ body.light-theme {
   --shadow-glow: 0 0 35px rgba(99, 102, 241, 0.05);
 }
 
+/* App color accents (beyond plain B/W) */
+body[data-accent="ocean"] {
+  --primary-color: #0ea5e9;
+  --primary-hover: #0284c7;
+  --accent-color: #06b6d4;
+  --primary-gradient: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  --shadow-card-hover: 0 16px 36px -12px rgba(14, 165, 233, 0.18);
+  --shadow-glow: 0 0 35px rgba(14, 165, 233, 0.12);
+}
+body[data-accent="forest"] {
+  --primary-color: #10b981;
+  --primary-hover: #059669;
+  --accent-color: #34d399;
+  --primary-gradient: linear-gradient(135deg, #059669 0%, #34d399 100%);
+  --shadow-card-hover: 0 16px 36px -12px rgba(16, 185, 129, 0.18);
+  --shadow-glow: 0 0 35px rgba(16, 185, 129, 0.12);
+}
+body[data-accent="sunset"] {
+  --primary-color: #f59e0b;
+  --primary-hover: #d97706;
+  --accent-color: #f97316;
+  --primary-gradient: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  --shadow-card-hover: 0 16px 36px -12px rgba(245, 158, 11, 0.18);
+  --shadow-glow: 0 0 35px rgba(249, 115, 22, 0.12);
+}
+body[data-accent="rose"] {
+  --primary-color: #ec4899;
+  --primary-hover: #db2777;
+  --accent-color: #f472b6;
+  --primary-gradient: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+  --shadow-card-hover: 0 16px 36px -12px rgba(236, 72, 153, 0.18);
+  --shadow-glow: 0 0 35px rgba(236, 72, 153, 0.12);
+}
+body[data-accent="slate"] {
+  --primary-color: #64748b;
+  --primary-hover: #475569;
+  --accent-color: #94a3b8;
+  --primary-gradient: linear-gradient(135deg, #64748b 0%, #94a3b8 100%);
+  --shadow-card-hover: 0 16px 36px -12px rgba(100, 116, 139, 0.18);
+  --shadow-glow: 0 0 35px rgba(100, 116, 139, 0.1);
+}
+
+/* App UI fonts */
+body[data-font="outfit"] { --font-sans: 'Outfit', sans-serif; --font-title: 'Outfit', sans-serif; }
+body[data-font="serif"] { --font-sans: 'Source Serif 4', Georgia, serif; --font-title: 'Source Serif 4', Georgia, serif; }
+body[data-font="merriweather"] { --font-sans: 'Merriweather', Georgia, serif; --font-title: 'Merriweather', Georgia, serif; }
+body[data-font="mono"] { --font-sans: 'JetBrains Mono', ui-monospace, monospace; --font-title: 'JetBrains Mono', ui-monospace, monospace; }
+body[data-font="system"] { --font-sans: system-ui, -apple-system, Segoe UI, sans-serif; --font-title: system-ui, -apple-system, Segoe UI, sans-serif; }
+body[data-font="inter"] { --font-sans: 'Inter', sans-serif; --font-title: 'Outfit', sans-serif; }
+
 /* Global Reset */
 * {
   box-sizing: border-box;
@@ -1321,6 +1371,30 @@ body.light-theme .progress-bar-wrapper {
   background: #ffffff;
 }
 
+/* Canvas + overlays share one box so signature coords match the page */
+.editor-page-stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.editor-page-stage > canvas:first-of-type {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.editor-element-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
 .page-badge {
   position: absolute;
   top: -24px;
@@ -1331,4 +1405,165 @@ body.light-theme .progress-bar-wrapper {
   background: rgba(0,0,0,0.2);
   padding: 2px 8px;
   border-radius: 4px;
+  z-index: 5;
 }
+
+/* Saved signature chips (Sign PDF sidebar) */
+.saved-sig-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.saved-sig-item {
+  position: relative;
+  width: calc(50% - 0.25rem);
+  background: #fff;
+  border: 2px solid var(--border-card);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.saved-sig-item.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.saved-sig-pick {
+  display: block;
+  width: 100%;
+  padding: 0.4rem;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+}
+
+.saved-sig-pick img {
+  display: block;
+  width: 100%;
+  height: 48px;
+  object-fit: contain;
+}
+
+.saved-sig-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.saved-sig-delete:hover {
+  background: var(--color-red);
+}
+
+/* ==========================================
+   AI SUMMARY RESULT PANEL
+   ========================================== */
+.summary-result {
+  width: 100%;
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem;
+  text-align: left;
+  line-height: 1.65;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.summary-result-body { min-height: 80px; }
+.summary-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+}
+
+.summary-result .sum-h2 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+}
+.summary-result .sum-h3 {
+  font-size: 1.1rem;
+  margin: 1rem 0 0.5rem;
+}
+.summary-result .sum-h4 {
+  font-size: 1rem;
+  margin: 0.85rem 0 0.4rem;
+}
+.summary-result .sum-li {
+  margin: 0.25rem 0 0.25rem 1.1rem;
+}
+.summary-result .sum-li-num {
+  list-style-type: decimal;
+}
+.summary-result .sum-callout {
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--sum-accent, #6366f1);
+  background: rgba(127, 127, 127, 0.08);
+  border-radius: 6px;
+  margin: 0.75rem 0;
+}
+
+/* Modes */
+.summary-result.sum-mode-light {
+  background: #fbfbfd;
+  color: #1f2937;
+}
+.summary-result.sum-mode-dark {
+  background: #12121a;
+  color: #e8e8f0;
+}
+
+/* Color themes (accent + soft tint) */
+.summary-result.sum-theme-indigo { --sum-accent: #6366f1; }
+.summary-result.sum-theme-ocean { --sum-accent: #0ea5e9; }
+.summary-result.sum-theme-forest { --sum-accent: #10b981; }
+.summary-result.sum-theme-sunset { --sum-accent: #f59e0b; }
+.summary-result.sum-theme-rose { --sum-accent: #ec4899; }
+.summary-result.sum-theme-slate { --sum-accent: #64748b; }
+
+.summary-result.sum-mode-light.sum-theme-indigo { background: #f5f3ff; border-color: rgba(99,102,241,0.2); }
+.summary-result.sum-mode-light.sum-theme-ocean { background: #f0f9ff; border-color: rgba(14,165,233,0.22); }
+.summary-result.sum-mode-light.sum-theme-forest { background: #ecfdf5; border-color: rgba(16,185,129,0.22); }
+.summary-result.sum-mode-light.sum-theme-sunset { background: #fffbeb; border-color: rgba(245,158,11,0.25); }
+.summary-result.sum-mode-light.sum-theme-rose { background: #fdf2f8; border-color: rgba(236,72,153,0.22); }
+.summary-result.sum-mode-light.sum-theme-slate { background: #f8fafc; border-color: rgba(100,116,139,0.25); }
+
+.summary-result.sum-mode-dark.sum-theme-indigo { background: #141222; border-color: rgba(99,102,241,0.28); }
+.summary-result.sum-mode-dark.sum-theme-ocean { background: #0b1520; border-color: rgba(14,165,233,0.28); }
+.summary-result.sum-mode-dark.sum-theme-forest { background: #0c1713; border-color: rgba(16,185,129,0.28); }
+.summary-result.sum-mode-dark.sum-theme-sunset { background: #1a140c; border-color: rgba(245,158,11,0.28); }
+.summary-result.sum-mode-dark.sum-theme-rose { background: #1a1016; border-color: rgba(236,72,153,0.28); }
+.summary-result.sum-mode-dark.sum-theme-slate { background: #12161c; border-color: rgba(148,163,184,0.25); }
+
+.summary-result .sum-h2,
+.summary-result .sum-h3,
+.summary-result .sum-h4 {
+  color: var(--sum-accent);
+  font-family: inherit;
+}
+
+/* Fonts for summary panel only */
+.summary-result.sum-font-inter { font-family: 'Inter', sans-serif; }
+.summary-result.sum-font-outfit { font-family: 'Outfit', sans-serif; }
+.summary-result.sum-font-serif { font-family: 'Source Serif 4', Georgia, serif; }
+.summary-result.sum-font-merriweather { font-family: 'Merriweather', Georgia, serif; }
+.summary-result.sum-font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.88rem; }
+.summary-result.sum-font-system { font-family: system-ui, -apple-system, Segoe UI, sans-serif; }

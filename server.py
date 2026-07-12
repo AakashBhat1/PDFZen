@@ -149,6 +149,113 @@ def health() -> dict:
     return {"status": "ok", "libreoffice": libreoffice_available()}
 
 
+# --- Service logs (written by start-pdfzen.ps1 into ./logs) ---
+_LOG_DIR = Path(__file__).resolve().parent / "logs"
+_LOG_ALIASES = {
+    "ollama": ("ollama.log", "ollama.err.log"),
+    "backend": ("backend.log",),
+    "frontend": ("frontend.log",),
+    "launcher": ("launcher.log",),
+}
+
+
+def _tail_text(path: Path, max_lines: int = 250, max_bytes: int = 256_000) -> str:
+    """Return the last *max_lines* of a log file (capped by *max_bytes*)."""
+    if not path.is_file():
+        return ""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as fh:
+            if size > max_bytes:
+                fh.seek(size - max_bytes)
+                fh.readline()  # drop partial first line
+            raw = fh.read()
+        text = raw.decode("utf-8", errors="replace")
+        lines = text.splitlines()
+        if len(lines) > max_lines:
+            lines = lines[-max_lines:]
+        return "\n".join(lines)
+    except OSError as exc:
+        return f"[error reading {path.name}: {exc}]"
+
+
+@app.get("/api/logs")
+def list_service_logs() -> dict:
+    """List known service log files under ./logs (for the Settings UI)."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    files = []
+    for name, candidates in _LOG_ALIASES.items():
+        for fname in candidates:
+            path = _LOG_DIR / fname
+            entry = {
+                "id": fname.replace(".log", "").replace(".", "-"),
+                "name": fname,
+                "group": name,
+                "exists": path.is_file(),
+                "size": path.stat().st_size if path.is_file() else 0,
+                "mtime": path.stat().st_mtime if path.is_file() else None,
+            }
+            files.append(entry)
+    # Any other *.log in the folder
+    for path in sorted(_LOG_DIR.glob("*.log")):
+        if not any(path.name == c for cand in _LOG_ALIASES.values() for c in cand):
+            files.append(
+                {
+                    "id": path.stem,
+                    "name": path.name,
+                    "group": "other",
+                    "exists": True,
+                    "size": path.stat().st_size,
+                    "mtime": path.stat().st_mtime,
+                }
+            )
+    return {"dir": str(_LOG_DIR), "files": files}
+
+
+@app.get("/api/logs/{log_name}")
+def get_service_log(log_name: str, tail: int = 250) -> dict:
+    """Return the tail of a log file. *log_name* is a basename like ``ollama.log`` or alias ``ollama``."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    tail = max(20, min(int(tail), 2000))
+
+    # Alias → preferred file
+    name = log_name.strip().lower()
+    if name in _LOG_ALIASES:
+        path = None
+        for fname in _LOG_ALIASES[name]:
+            candidate = _LOG_DIR / fname
+            if candidate.is_file():
+                path = candidate
+                break
+        if path is None:
+            path = _LOG_DIR / _LOG_ALIASES[name][0]
+    else:
+        # Only allow simple basenames inside logs/
+        safe = Path(name).name
+        if safe != name or ".." in name or "/" in name or "\\" in name:
+            raise HTTPException(status_code=400, detail="Invalid log name.")
+        if not safe.endswith(".log"):
+            safe = f"{safe}.log"
+        path = _LOG_DIR / safe
+
+    if not path.is_file():
+        return {
+            "name": path.name,
+            "exists": False,
+            "content": f"(no log yet: {path.name})\nStart the app with start.bat so logs are written to:\n{_LOG_DIR}",
+            "dir": str(_LOG_DIR),
+        }
+
+    return {
+        "name": path.name,
+        "exists": True,
+        "size": path.stat().st_size,
+        "mtime": path.stat().st_mtime,
+        "content": _tail_text(path, max_lines=tail),
+        "dir": str(_LOG_DIR),
+    }
+
+
 @app.post("/convert/pdf-to-word")
 async def convert_pdf_to_word(file: UploadFile = File(...)):
     return await _run_conversion(

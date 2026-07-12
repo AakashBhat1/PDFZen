@@ -72,9 +72,10 @@ export function createEditorUI(container, title, subtitle, isSignMode = false) {
       ${isSignMode ? `
         <!-- Sign PDF Panel -->
         <div class="form-group">
-          <label>Signature Options</label>
+          <label>Your Signatures</label>
+          <div id="saved-sig-list" class="saved-sig-list"></div>
           <button id="btn-draw-sig-pad" class="btn btn-secondary" style="width:100%; margin-top:0.5rem;">
-            <i class="bi bi-pencil"></i> Create Signature
+            <i class="bi bi-pencil"></i> Create New Signature
           </button>
         </div>
         <div id="signature-preview-box" class="form-group" style="display:none; margin-top: 0.75rem; text-align:center;">
@@ -82,9 +83,9 @@ export function createEditorUI(container, title, subtitle, isSignMode = false) {
           <div style="padding:10px; background:#fff; border:1px solid var(--border-card); border-radius:8px; margin-top:0.25rem;">
             <img id="active-sig-img" style="max-height:80px; object-fit:contain; max-width:100%;">
           </div>
-          <span class="form-help">Click active page to place, then drag and resize.</span>
+          <span class="form-help">Click a page to place the signature, then drag or resize it.</span>
           <button id="btn-stamp-sig" class="btn btn-secondary" style="width:100%; margin-top:0.75rem;">
-            <i class="bi bi-patch-check"></i> Place on Page
+            <i class="bi bi-patch-check"></i> Place on First Page
           </button>
         </div>
       ` : `
@@ -239,7 +240,8 @@ export function createEditorUI(container, title, subtitle, isSignMode = false) {
     activeSigImg: container.querySelector('#active-sig-img'),
     sigColorSelect: container.querySelector('#sig-draw-color'),
     sigTypeInput: container.querySelector('#sig-type-input'),
-    stampSigBtn: container.querySelector('#btn-stamp-sig')
+    stampSigBtn: container.querySelector('#btn-stamp-sig'),
+    savedSigList: container.querySelector('#saved-sig-list')
   };
 }
 
@@ -271,6 +273,15 @@ export function selectElement(el) {
   deselectAllElements();
   selectedElement = el;
   el.classList.add('selected');
+}
+
+/** Display-size bounds for placed elements (CSS px of the page stage). */
+export function getStageSize(pc) {
+  const stage = pc.stage || pc.wrapper;
+  return {
+    width: stage.clientWidth || pc.canvas?.clientWidth || pc.overlayCanvas?.width || 0,
+    height: stage.clientHeight || pc.canvas?.clientHeight || pc.overlayCanvas?.height || 0
+  };
 }
 
 export function setupDragAndResize(el, pc) {
@@ -305,27 +316,40 @@ export function setupDragAndResize(el, pc) {
     if (isDragging) {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      const maxLeft = pc.overlayCanvas.width - el.offsetWidth;
-      const maxTop = pc.overlayCanvas.height - el.offsetHeight;
-      
-      let newLeft = Math.max(0, Math.min(maxLeft, startLeft + dx));
-      let newTop = Math.max(0, Math.min(maxTop, startTop + dy));
-      
+      const { width: stageW, height: stageH } = getStageSize(pc);
+      const maxLeft = Math.max(0, stageW - el.offsetWidth);
+      const maxTop = Math.max(0, stageH - el.offsetHeight);
+
+      const newLeft = Math.max(0, Math.min(maxLeft, startLeft + dx));
+      const newTop = Math.max(0, Math.min(maxTop, startTop + dy));
+
       el.style.left = `${newLeft}px`;
       el.style.top = `${newTop}px`;
+      el.dataset.left = String(newLeft);
+      el.dataset.top = String(newTop);
     } else if (isResizing) {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      
-      let newWidth = Math.max(40, startW + dx);
-      let newHeight = Math.max(20, startH + dy);
-      
+      const { width: stageW, height: stageH } = getStageSize(pc);
+
+      const newWidth = Math.max(40, Math.min(stageW - el.offsetLeft, startW + dx));
+      const newHeight = Math.max(20, Math.min(stageH - el.offsetTop, startH + dy));
+
       el.style.width = `${newWidth}px`;
       el.style.height = `${newHeight}px`;
+      el.dataset.width = String(newWidth);
+      el.dataset.height = String(newHeight);
     }
   });
 
   document.addEventListener('mouseup', () => {
+    if (isDragging || isResizing) {
+      // Final snap of layout metrics
+      el.dataset.left = String(el.offsetLeft);
+      el.dataset.top = String(el.offsetTop);
+      el.dataset.width = String(el.offsetWidth);
+      el.dataset.height = String(el.offsetHeight);
+    }
     isDragging = false;
     isResizing = false;
   });
@@ -340,13 +364,18 @@ export function createDraggableElement(pc, htmlContent, width, height, left, top
   el.style.height = `${height}px`;
   el.style.pointerEvents = 'auto';
   el.dataset.type = type; // 'text', 'image', 'signature'
-  
+  // Persist layout as data attrs so bake can recover if layout is read at a bad time
+  el.dataset.left = String(left);
+  el.dataset.top = String(top);
+  el.dataset.width = String(width);
+  el.dataset.height = String(height);
+
   el.innerHTML = `
     ${htmlContent}
     <div class="delete-handle" title="Delete element"><i class="bi bi-x-lg"></i></div>
     <div class="resize-handle" title="Resize element"></div>
   `;
-  
+
   pc.elementContainer.appendChild(el);
   
   el.addEventListener('click', (e) => {
@@ -381,56 +410,106 @@ export function createDraggableElement(pc, htmlContent, width, height, left, top
   return el;
 }
 
+/**
+ * Map CSS-pixel positions of DOM overlays onto the canvas bitmap resolution.
+ * Placed elements live in display space; the PDF bake canvas is internal pixels.
+ */
+function getDisplayToCanvasScale(pc) {
+  const { width: displayW, height: displayH } = getStageSize(pc);
+  const canvasW = pc.overlayCanvas?.width || pc.canvas?.width || displayW || 1;
+  const canvasH = pc.overlayCanvas?.height || pc.canvas?.height || displayH || 1;
+  return {
+    scaleX: canvasW / Math.max(1, displayW),
+    scaleY: canvasH / Math.max(1, displayH)
+  };
+}
+
+function loadImageElement(img) {
+  return new Promise((resolve) => {
+    if (!img) {
+      resolve(null);
+      return;
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      resolve(img);
+      return;
+    }
+    const done = () => resolve(img.naturalWidth > 0 ? img : null);
+    img.onload = done;
+    img.onerror = () => resolve(null);
+  });
+}
+
+/** Read element box from live layout, falling back to style / data attributes. */
+function getElementBox(el) {
+  let left = el.offsetLeft;
+  let top = el.offsetTop;
+  let width = el.offsetWidth;
+  let height = el.offsetHeight;
+
+  // Detached or zero-layout nodes: recover from style / dataset
+  if (!width || !height) {
+    left = parseFloat(el.dataset.left ?? el.style.left) || 0;
+    top = parseFloat(el.dataset.top ?? el.style.top) || 0;
+    width = parseFloat(el.dataset.width ?? el.style.width) || 0;
+    height = parseFloat(el.dataset.height ?? el.style.height) || 0;
+  }
+  return { left, top, width, height };
+}
+
 // Bake drawings and DOM components into one overlay png per page
 export async function bakeElementsAndGetBlob(pc) {
   const oCanvas = pc.overlayCanvas;
-  
+  const pageCanvas = pc.canvas;
+
   const bakeCanvas = document.createElement('canvas');
-  bakeCanvas.width = oCanvas.width;
-  bakeCanvas.height = oCanvas.height;
+  bakeCanvas.width = oCanvas.width || pageCanvas?.width || 1;
+  bakeCanvas.height = oCanvas.height || pageCanvas?.height || 1;
   const bakeCtx = bakeCanvas.getContext('2d');
 
-  // 1. Draw drawings/shapes first
-  bakeCtx.drawImage(oCanvas, 0, 0);
+  // 1. Freehand / shape drawings (already in canvas pixel space)
+  if (oCanvas.width > 0 && oCanvas.height > 0) {
+    bakeCtx.drawImage(oCanvas, 0, 0);
+  }
 
-  // 2. Draw placed DOM elements (texts, images, signatures)
+  // 2. Placed DOM elements (CSS space → canvas space)
+  const { scaleX, scaleY } = getDisplayToCanvasScale(pc);
   const placedEls = pc.elementContainer.querySelectorAll('.placed-element');
-  
+
   for (const el of placedEls) {
-    const left = el.offsetLeft;
-    const top = el.offsetTop;
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
+    const box = getElementBox(el);
+    if (!box.width || !box.height) continue;
+
+    const left = box.left * scaleX;
+    const top = box.top * scaleY;
+    const width = box.width * scaleX;
+    const height = box.height * scaleY;
 
     if (el.dataset.type === 'text') {
       const textDiv = el.querySelector('.text-content');
-      const text = textDiv.dataset.val || textDiv.innerText;
+      const text = textDiv?.dataset.val || textDiv?.innerText || '';
+      if (!text) continue;
       const computed = window.getComputedStyle(textDiv);
       const color = computed.color || '#312e81';
-      const font = computed.font || 'bold 16px Arial';
-      
+      const fontSize = parseFloat(computed.fontSize) || 16;
+      const fontFamily = computed.fontFamily || 'Arial';
+      const fontWeight = computed.fontWeight || 'bold';
+
       bakeCtx.save();
       bakeCtx.fillStyle = color;
-      bakeCtx.font = font;
+      bakeCtx.font = `${fontWeight} ${fontSize * scaleY}px ${fontFamily}`;
       bakeCtx.textBaseline = 'top';
       bakeCtx.textAlign = 'left';
-      bakeCtx.fillText(text, left + 4, top + 4);
+      bakeCtx.fillText(text, left + 4 * scaleX, top + 4 * scaleY);
       bakeCtx.restore();
     } else if (el.dataset.type === 'image' || el.dataset.type === 'signature') {
-      const img = el.querySelector('img');
-      if (img && img.src) {
-        await new Promise((resolve) => {
-          if (img.complete) {
-            bakeCtx.drawImage(img, left, top, width, height);
-            resolve();
-          } else {
-            img.onload = () => {
-              bakeCtx.drawImage(img, left, top, width, height);
-              resolve();
-            };
-            img.onerror = () => resolve();
-          }
-        });
+      const imgEl = el.querySelector('img');
+      // Prefer a fresh Image from src so bake is not tied to a detached DOM img
+      const src = imgEl?.currentSrc || imgEl?.src;
+      if (!src) continue;
+      const img = await loadImageFromSrc(src);
+      if (img) {
+        bakeCtx.drawImage(img, left, top, width, height);
       }
     }
   }
@@ -438,6 +517,11 @@ export async function bakeElementsAndGetBlob(pc) {
   return await canvasToBlob(bakeCanvas, 'image/png');
 }
 
-// ==========================================
-// 1. EDIT PDF
-// ==========================================
+function loadImageFromSrc(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}

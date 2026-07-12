@@ -36,7 +36,7 @@ try {
     if (Test-Path $iconPath) {
         $shortcut.IconLocation = "$iconPath,0"
     }
-    $shortcut.Description = "Launch PDFZen Web and Backend Services"
+    $shortcut.Description = "Launch PDFZen + Ollama (Vulkan/iGPU); open main tools dashboard; close window to stop all"
     $shortcut.Save()
     
     Write-Host "[OK] Desktop shortcut created successfully!" -ForegroundColor Green
